@@ -5,7 +5,7 @@ use std::{
 use exch_observer_types::{ExchangeSymbol, ExchangeObserver};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BinanceConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
