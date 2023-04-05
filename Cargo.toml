@@ -1,0 +1,25 @@
+[workspace]
+members = [
+  "exch_observer",
+  "exch_observer_types",
+  "exch_subobservers",
+  "exch_observer_config"
+]
+
+[workspace.package]
+version = "0.0.1"
+authors = ["theonekeyg@gmail.com"]
+homepage = "https://github.com/theonekeyg"
+edition = "2021"
+
+[workspace.dependencies]
+tokio = { version = "1.27.0", features = ["full"] }
+binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
+log = "0.4.17"
+toml = "0.7.3"
+env_logger = "0.10.0"
+serde = { version = "1.0.159", features = ["derive"] }
+exch_observer_types = { path = "exch_observer_types" }
+exch_observer_config = { path = "exch_observer_config" }
+exch_subobservers = { path = "exch_subobservers" }
+exch_observer = { path = "exch_observer" }
