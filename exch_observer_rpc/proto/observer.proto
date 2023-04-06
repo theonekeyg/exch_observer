@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package exch_observer_rpc;
+
+service ExchObserver {
+    rpc GetPrice (GetPriceRequest) returns (GetPriceResponse) {}
+}
+
+message GetPriceRequest {
+    string base = 1;
+    string quote = 2;
+    string exchange = 3;
+}
+
+message GetPriceResponse {
+    string base = 1;
+    string quote = 2;
+    double price = 3;
+}

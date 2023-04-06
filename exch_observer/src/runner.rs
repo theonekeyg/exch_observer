@@ -7,14 +7,16 @@ use exch_subobservers::BinanceObserver;
 
 pub struct ObserverRunner {
     pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver>>,
+    pub is_running: bool,
     pub config: ObserverConfig
 }
 
 impl ObserverRunner {
-    pub fn new(config_path: String) -> Self {
+    pub fn new(config: ObserverConfig) -> Self {
         Self {
             observers: HashMap::new(),
-            config: ObserverConfig::parse_config(config_path).unwrap()
+            is_running: false,
+            config: config,
         }
     }
 
@@ -25,6 +27,7 @@ impl ObserverRunner {
             self.observers.insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
 
+        self.is_running = true;
         Ok(())
     }
 

@@ -11,10 +11,6 @@ use tokio::runtime::Runtime;
 pub struct ExchangeSymbol {
     pub base: String,
     pub quote: String,
-    pub min_price: f64,
-    pub base_precision: u8,
-    pub qty_step_size: f64,
-    pub price_tick_size: f64,
 }
 
 impl Hash for ExchangeSymbol {
@@ -37,25 +33,17 @@ impl Into<String> for &ExchangeSymbol {
 }
 
 impl ExchangeSymbol {
-    pub fn from<S: Into<String>>(base: S, quote: S, min_price: f64, base_precision: u8) -> Self {
+    pub fn from<S: Into<String>>(base: S, quote: S) -> Self {
         Self {
             base: base.into(),
             quote: quote.into(),
-            min_price: min_price,
-            base_precision: base_precision,
-            qty_step_size: 1e-05,
-            price_tick_size: 1e-07,
         }
     }
 
-    pub fn new<S: Into<String>>(base: S, quote: S, min_price: f64, base_precision: u8, qty_step_size: f64, price_tick_size: f64) -> Self {
+    pub fn new<S: Into<String>>(base: S, quote: S) -> Self {
         Self {
             base: base.into(),
             quote: quote.into(),
-            min_price: min_price,
-            base_precision: base_precision,
-            qty_step_size: qty_step_size,
-            price_tick_size: price_tick_size,
         }
     }
 }
@@ -166,4 +154,16 @@ pub trait ExchangeObserver {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ExchangeObserverKind {
     Binance,
+    Bitfinex,
+    Bitmex,
+    Bittrex,
+    Coinbase,
+    Deribit,
+    Ftx,
+    Huobi,
+    Kraken,
+    Okex,
+    Poloniex,
+    Uniswap,
+    Unknown,
 }
