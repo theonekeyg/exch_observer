@@ -18,6 +18,7 @@ use tonic::{
     transport::Server,
     Request, Response, Status
 };
+use log::info;
 
 pub struct GrpcObserver {
     observer: Arc<RwLock<ObserverRunner>>,
@@ -94,8 +95,11 @@ impl ObserverRpcRunner {
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let addr: SocketAddr = format!(
-            "{}:{}", self.config.host.get_or_insert("[::1]".into()), self.config.port
+            "{}:{}",
+            self.config.host.get_or_insert("[::1]".into()),
+            self.config.port.get_or_insert(50051)
         ).parse()?;
+        info!("Starting RPC service");
 
         Server::builder()
             .add_service(ExchObserverServer::from_arc(self.rpc.clone()))

@@ -13,23 +13,23 @@ pub struct BinanceConfig {
     pub num_threads: Option<usize>
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct RpcConfig {
-    pub port: u16,
+    pub port: Option<u16>,
     pub host: Option<String>
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ObserverConfig {
-    pub binance_config: Option<BinanceConfig>,
-    pub rpc_config: Option<RpcConfig>
+    pub binance: Option<BinanceConfig>,
+    pub rpc: Option<RpcConfig>
 }
 
 impl ObserverConfig {
     pub fn new() -> Self {
         Self {
-            binance_config: None,
-            rpc_config: None
+            binance: None,
+            rpc: None
         }
     }
 

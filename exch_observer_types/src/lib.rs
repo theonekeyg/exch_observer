@@ -4,7 +4,10 @@ use std::{
     fmt::{self, Display, Formatter},
     sync::{Arc, Mutex, atomic::AtomicBool},
 };
-use binance::{account::OrderSide};
+use binance::{
+    account::OrderSide,
+    model::Balance as BinanceBalance
+};
 use tokio::runtime::Runtime;
 
 #[derive(Debug, Clone)]
@@ -166,4 +169,45 @@ pub enum ExchangeObserverKind {
     Poloniex,
     Uniswap,
     Unknown,
+}
+
+#[derive(Debug)]
+pub struct ExchangeBalance {
+    pub asset: String,
+    pub free: f64,
+    pub locked: f64,
+}
+
+impl ExchangeBalance {
+    pub fn new(asset: String, free: f64, locked: f64) -> Self {
+        Self {
+            asset: asset,
+            free: free,
+            locked: locked,
+        }
+    }
+}
+
+pub trait ExchangeClient {
+    /// Checks if symbol exists on the exchange
+    fn symbol_exists(&self, symbol: &ExchangeSymbol) -> bool;
+
+    /// Fetches the balance of the current logged in user
+    fn get_balance(&self, asset: &String) -> Option<ExchangeBalance>;
+
+    /// Makes buy order on the exchange
+    fn buy_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64);
+
+    /// Makes sell order on the exchange
+    fn sell_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64);
+}
+
+impl Into<ExchangeBalance> for BinanceBalance {
+    fn into(self) -> ExchangeBalance {
+        ExchangeBalance::new(
+            self.asset,
+            self.free.parse::<f64>().unwrap(),
+            self.locked.parse::<f64>().unwrap(),
+        )
+    }
 }

@@ -13,12 +13,15 @@ use std::{
     vec::Vec,
 };
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use csv::Reader;
+use log::warn;
 
 use exch_observer_types::{
     ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
-    SwapOrder, ExchangeObserver
+    SwapOrder, ExchangeObserver, ExchangeClient
 };
 use exch_observer_config::BinanceConfig;
+use exch_clients::BinanceClient;
 
 #[allow(unused)]
 fn all_ticker_stream() -> &'static str {
@@ -86,26 +89,28 @@ fn diff_book_depth_stream(symbol: &str, update_speed: u16) -> String {
 
 static BINANCE_USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
-#[derive(Debug)]
 pub struct BinanceObserver {
     pub watching_symbols: Vec<ExchangeSymbol>,
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol>>,
     price_table: Arc<HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>>,
     is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>,
     config: BinanceConfig,
+    client: Option<Arc<Box<dyn ExchangeClient>>>,
     async_runner: Runtime,
 }
 
 impl BinanceObserver {
-    pub fn new(config: BinanceConfig) -> Self {
+    pub fn new(config: BinanceConfig, client: Option<Arc<Box<dyn ExchangeClient>>>) -> Self {
+        let n_threads = config.num_threads.unwrap_or(4);
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
             is_running_table: Arc::new(HashMap::new()),
             config: config,
+            client: client,
             async_runner: RuntimeBuilder::new_multi_thread()
-                .worker_threads(8)
+                .worker_threads(n_threads)
                 .build()
                 .unwrap(),
         }
@@ -150,6 +155,35 @@ impl BinanceObserver {
         });
 
         Ok(())
+    }
+
+    /// This function expects the containing self.config_symbols_path file to be in the following
+    /// csv format:
+    /// * base: <base symbol>,
+    /// * quote: <quote symbol>
+    pub fn load_symbols_from_csv(&mut self) {
+        let mut rdr = Reader::from_path(&self.config.symbols_path).unwrap();
+        for result in rdr.records() {
+            let result = result.unwrap();
+            let base_sym = result.get(1).unwrap();
+            let quote_sym = result.get(2).unwrap();
+
+            self.add_watching_symbol(&ExchangeSymbol::new(base_sym, quote_sym));
+        }
+    }
+
+    fn add_watching_symbol(&mut self, symbol: &ExchangeSymbol) {
+        if let Some(client) = &self.client {
+            if !client.symbol_exists(*&symbol) {
+                warn!(
+                    "Added trading pair `{}` doesn't exist on binance, skip it",
+                    symbol
+                );
+                return;
+            }
+        }
+
+        self.add_price_to_monitor(symbol, &Arc::new(Mutex::new(ExchangeValues::new())));
     }
 }
 

@@ -5,6 +5,7 @@ members = [
   "exch_subobservers",
   "exch_observer_config",
   "exch_observer_rpc",
+  "exch_clients",
   "exch_cli"
 ]
 
@@ -17,11 +18,18 @@ edition = "2021"
 [workspace.dependencies]
 tokio = { version = "1.27.0", features = ["full"] }
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
+clap = { version = "4.2.1", features = ["derive"] }
 log = "0.4.17"
 toml = "0.7.3"
+csv = "1.2.1"
+dotenvy = "0.15.6"
 env_logger = "0.10.0"
+tonic = "0.9.1"
+prost = "0.11.8"
+tonic-build = "0.9.1"
 serde = { version = "1.0.159", features = ["derive"] }
 exch_observer_types = { path = "exch_observer_types" }
+exch_clients = { path = "exch_clients" }
 exch_observer_config = { path = "exch_observer_config" }
 exch_observer_rpc = { path = "exch_observer_rpc" }
 exch_subobservers = { path = "exch_subobservers" }
