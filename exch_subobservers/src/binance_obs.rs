@@ -2,7 +2,7 @@ use binance::{
     errors::Result as BResult,
     websockets::{WebSockets, WebsocketEvent},
 };
-use log::{info, trace};
+use log::{info, trace, debug};
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -10,6 +10,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
+    ops::Deref,
     vec::Vec,
 };
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
@@ -96,12 +97,11 @@ pub struct BinanceObserver {
     is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>,
     config: BinanceConfig,
     client: Option<Arc<Box<dyn ExchangeClient>>>,
-    async_runner: Runtime,
+    async_runner: Arc<Runtime>,
 }
 
 impl BinanceObserver {
-    pub fn new(config: BinanceConfig, client: Option<Arc<Box<dyn ExchangeClient>>>) -> Self {
-        let n_threads = config.num_threads.unwrap_or(4);
+    pub fn new(config: BinanceConfig, client: Option<Arc<Box<dyn ExchangeClient>>>, async_runner: Arc<Runtime>) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
@@ -109,10 +109,7 @@ impl BinanceObserver {
             is_running_table: Arc::new(HashMap::new()),
             config: config,
             client: client,
-            async_runner: RuntimeBuilder::new_multi_thread()
-                .worker_threads(n_threads)
-                .build()
-                .unwrap(),
+            async_runner: async_runner
         }
     }
 
@@ -141,7 +138,7 @@ impl BinanceObserver {
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
                         let price = (price_high + price_low) / 2.0;
                         update_value.lock().unwrap().update_price(price);
-                        trace!("[{}] Price: {:?}", kline.symbol, price);
+                        debug!("[{}] Price: {:?}", kline.symbol, price);
                     }
                     _ => (),
                 }
@@ -239,7 +236,7 @@ impl ExchangeObserver for BinanceObserver {
             }
 
             Self::launch_worker(
-                &self.async_runner,
+                self.async_runner.deref(),
                 symbol.clone(),
                 update_value,
                 self.is_running_table.clone(),
@@ -290,7 +287,7 @@ impl ExchangeObserver for BinanceObserver {
             }
 
             Self::launch_worker(
-                &self.async_runner,
+                self.async_runner.deref(),
                 symbol.clone(),
                 update_value,
                 self.is_running_table.clone(),

@@ -10,7 +10,6 @@ pub struct BinanceConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
     pub symbols_path: String,
-    pub num_threads: Option<usize>
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -21,6 +20,7 @@ pub struct RpcConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct ObserverConfig {
+    pub num_threads: Option<usize>,
     pub binance: Option<BinanceConfig>,
     pub rpc: Option<RpcConfig>
 }
@@ -28,6 +28,7 @@ pub struct ObserverConfig {
 impl ObserverConfig {
     pub fn new() -> Self {
         Self {
+            num_threads: None,
             binance: None,
             rpc: None
         }

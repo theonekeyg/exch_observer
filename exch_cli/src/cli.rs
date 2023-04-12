@@ -7,6 +7,7 @@ use exch_observer::ObserverRunner;
 use clap::{
     Parser, Subcommand
 };
+use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 #[derive(Debug, Subcommand)]
 pub enum ExchCliCommand {
@@ -49,6 +50,7 @@ impl ExchCli {
         let rpc_config = config.rpc.clone().unwrap_or_default();
         let mut obs = Arc::new(RwLock::new(ObserverRunner::new(config)));
         obs.write().unwrap().launch();
+        let runtime = obs.read().unwrap().get_async_runner();
         let mut rpc_runner = ObserverRpcRunner::new(&obs, rpc_config);
         rpc_runner.run();
     }

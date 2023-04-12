@@ -17,18 +17,15 @@ use log::{info, debug, warn};
 pub struct BinanceClient {
     pub account: Arc<Account>,
     pub market: Arc<Market>,
-    pub async_runner: Runtime,
+    pub runtime: Arc<Runtime>,
 }
 
 impl BinanceClient {
-    pub fn new(api_key: Option<String>, secret_key: Option<String>, n_threads: usize) -> Self {
+    pub fn new(api_key: Option<String>, secret_key: Option<String>, async_runner: Arc<Runtime>) -> Self {
         Self {
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
             market: Arc::new(Market::new(api_key, secret_key)),
-            async_runner: RuntimeBuilder::new_multi_thread()
-                .worker_threads(n_threads)
-                .build()
-                .unwrap(),
+            runtime: async_runner,
         }
     }
 
@@ -120,14 +117,14 @@ impl ExchangeClient for BinanceClient {
 
     fn buy_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64) {
         Self::buy_order(
-            &self.async_runner, self.account.clone(),
+            &self.runtime, self.account.clone(),
             symbol.clone(), qty, price
         );
     }
 
     fn sell_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64) {
         Self::sell_order(
-            &self.async_runner, self.account.clone(),
+            &self.runtime, self.account.clone(),
             symbol.clone(), qty, price
         );
     }
