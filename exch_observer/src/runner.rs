@@ -1,20 +1,20 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::Arc
+    sync::{Arc, RwLock}
 };
+use log::info;
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use exch_observer_types::{
     ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeClient
 };
 use exch_observer_config::ObserverConfig;
-use exch_subobservers::BinanceObserver;
+use exch_subobservers::CombinedObserver;
+use exch_observer_rpc::ObserverRpcRunner;
 use exch_clients::BinanceClient;
 
 pub struct ObserverRunner {
-    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver>>,
-    pub clients: HashMap<ExchangeObserverKind, Arc<Box<dyn ExchangeClient>>>,
-    pub is_running: bool,
+    pub main_observer: Arc<RwLock<CombinedObserver>>,
     pub config: ObserverConfig,
     pub runtime: Arc<Runtime>
 }
@@ -27,10 +27,14 @@ impl ObserverRunner {
                 .build()
                 .unwrap()
         );
+        let observer = Arc::new(
+            RwLock::new(
+                CombinedObserver::new(config.clone(), async_runtime.clone())
+            )
+        );
+
         Self {
-            observers: HashMap::new(),
-            clients: HashMap::new(),
-            is_running: false,
+            main_observer: observer,
             config: config,
             runtime: async_runtime
         }
@@ -41,31 +45,27 @@ impl ObserverRunner {
     }
 
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
-        if let Some(binance_config) = &self.config.binance {
-            let binance_client = Arc::new(Box::new(BinanceClient::new(
-                binance_config.api_key.clone(),
-                binance_config.api_secret.clone(),
-                self.runtime.clone()
-            )) as Box<dyn ExchangeClient>);
-            let mut binance_observer = BinanceObserver::new(binance_config.clone(), Some(binance_client.clone()), self.runtime.clone());
-            binance_observer.load_symbols_from_csv();
-            binance_observer.start()?;
-            self.observers.insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
-            self.clients.insert(ExchangeObserverKind::Binance, binance_client);
-        }
+        let mut observer_binding = self.main_observer.write().unwrap();
+        let observer_handle = observer_binding.launch();
 
-        self.is_running = true;
-        Ok(())
-    }
+        // let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, self.config.rpc.clone().unwrap());
+        // let rpc_handle = Some(self.runtime.spawn(async move { rpc_observer.run(); }));
+        let rpc_handle = if let Some(ref rpc_config) = self.config.rpc {
+            let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, rpc_config.clone());
+            Some(self.runtime.spawn(async move { rpc_observer.run().await; }))
+        } else {
+            None
+        };
 
-    pub fn get_price(&self, kind: ExchangeObserverKind, symbol: &ExchangeSymbol) -> Option<f64> {
-
-        if let Some(observer) = self.observers.get(&kind) {
-            if let Some(price) = observer.get_price_from_table(&symbol) {
-                return Some(price.lock().unwrap().base_price);
+        self.runtime.block_on(async {
+            info!("Awaiting observer handle");
+            observer_handle.await.unwrap();
+            if let Some(rpc_handle) = rpc_handle {
+                info!("Awaiting rpc handle");
+                rpc_handle.await.unwrap();
             }
-        }
+        });
 
-        None
+        Ok(())
     }
 }

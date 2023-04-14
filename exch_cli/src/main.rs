@@ -3,10 +3,13 @@ use std::{
 };
 use clap::Parser;
 use dotenvy::dotenv;
-use exch_observer_rpc::{
-};
 use exch_observer::ObserverRunner;
 use exch_cli::{ExchCli, ExchCliCommand};
+use exch_clients::BinanceClient;
+use binance::{
+    account::Account,
+    api::Binance
+};
 
 fn main() {
     dotenv().ok();

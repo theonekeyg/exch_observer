@@ -18,7 +18,7 @@ pub struct RpcConfig {
     pub host: Option<String>
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ObserverConfig {
     pub num_threads: Option<usize>,
     pub binance: Option<BinanceConfig>,

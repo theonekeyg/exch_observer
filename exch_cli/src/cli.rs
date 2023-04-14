@@ -47,11 +47,15 @@ impl ExchCli {
     pub fn launch(&self, config: String) {
         let config = ObserverConfig::parse_config(config).unwrap();
         println!("{:?}", config);
+        let mut obs = ObserverRunner::new(config);
+        obs.launch().unwrap();
+        /*
         let rpc_config = config.rpc.clone().unwrap_or_default();
         let mut obs = Arc::new(RwLock::new(ObserverRunner::new(config)));
         obs.write().unwrap().launch();
-        let runtime = obs.read().unwrap().get_async_runner();
-        let mut rpc_runner = ObserverRpcRunner::new(&obs, rpc_config);
+        let runtime = obs.read().unwrap().get_async_runner().clone();
+        let mut rpc_runner = ObserverRpcRunner::new(&obs, rpc_config, runtime);
         rpc_runner.run();
+        */
     }
 }

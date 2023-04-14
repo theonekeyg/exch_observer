@@ -9,9 +9,10 @@ edition = "2021"
 tonic = { workspace = true }
 log = { workspace = true }
 prost = { workspace = true }
+tokio = { workspace = true }
 exch_observer_types = { workspace = true }
 exch_observer_config = { workspace = true }
-exch_observer = { workspace = true }
+exch_subobservers = { workspace = true }
 
 [build-dependencies]
 tonic-build = { workspace = true }

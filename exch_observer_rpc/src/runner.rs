@@ -11,7 +11,7 @@ use std::{
     net::SocketAddr,
     marker::Sync
 };
-use exch_observer::ObserverRunner;
+use exch_subobservers::CombinedObserver;
 use exch_observer_config::RpcConfig;
 use exch_observer_types::{ExchangeSymbol, ExchangeObserverKind};
 use tonic::{
@@ -19,13 +19,14 @@ use tonic::{
     Request, Response, Status
 };
 use log::info;
+use tokio::runtime::Runtime;
 
 pub struct GrpcObserver {
-    observer: Arc<RwLock<ObserverRunner>>,
+    observer: Arc<RwLock<CombinedObserver>>,
 }
 
 impl GrpcObserver {
-    pub fn new(observer: Arc<RwLock<ObserverRunner>>) -> Self {
+    pub fn new(observer: Arc<RwLock<CombinedObserver>>) -> Self {
         Self { observer: observer.clone() }
     }
 
@@ -85,27 +86,31 @@ pub struct ObserverRpcRunner {
     config: RpcConfig,
 }
 
+unsafe impl Send for ObserverRpcRunner {}
+unsafe impl Sync for ObserverRpcRunner {}
+
 impl ObserverRpcRunner {
-    pub fn new(observer: &Arc<RwLock<ObserverRunner>>, config: RpcConfig) -> Self {
+    pub fn new(observer: &Arc<RwLock<CombinedObserver>>, config: RpcConfig) -> Self {
         Self {
             rpc: Arc::new(GrpcObserver::new(observer.clone())),
             config: config,
         }
     }
 
-    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) {
         let addr: SocketAddr = format!(
             "{}:{}",
             self.config.host.get_or_insert("[::1]".into()),
             self.config.port.get_or_insert(50051)
-        ).parse()?;
+        )
+            .parse()
+            .unwrap();
         info!("Starting RPC service");
 
         Server::builder()
             .add_service(ExchObserverServer::from_arc(self.rpc.clone()))
             .serve(addr)
-            .await?;
-
-        Ok(())
+            .await
+            .unwrap();
     }
 }
