@@ -21,7 +21,7 @@ pub struct ObserverRunner {
 
 impl ObserverRunner {
     pub fn new(config: ObserverConfig) -> Self {
-        let mut observer = CombinedObserver::new(config.clone());
+        let mut observer = Arc::new(RwLock::new(CombinedObserver::new(config.clone())));
 
         let async_runtime = Arc::new(
             RuntimeBuilder::new_multi_thread()
@@ -31,10 +31,10 @@ impl ObserverRunner {
                 .unwrap()
         );
 
-        observer.set_runtime(async_runtime.clone());
+        observer.write().unwrap().set_runtime(async_runtime.clone());
 
         Self {
-            main_observer: Arc::new(RwLock::new(observer)),
+            main_observer: observer,
             config: config,
             runtime: async_runtime
         }
@@ -45,8 +45,9 @@ impl ObserverRunner {
     }
 
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
-        let mut observer_binding = self.main_observer.write().unwrap();
-        let observer_handle = observer_binding.launch();
+        self.main_observer.write().unwrap().launch().unwrap();
+        // let observer_handle = observer_binding.launch();
+        // let observer_handle = observer_binding.launch();
 
         // let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, self.config.rpc.clone().unwrap());
         // let rpc_handle = Some(self.runtime.spawn(async move { rpc_observer.run(); }));
@@ -58,8 +59,8 @@ impl ObserverRunner {
         };
 
         self.runtime.block_on(async {
-            info!("Awaiting observer handle");
-            observer_handle.await.unwrap();
+            // info!("Awaiting observer handle");
+            // observer_handle.await.unwrap();
             if let Some(rpc_handle) = rpc_handle {
                 info!("Awaiting rpc handle");
                 rpc_handle.await.unwrap();

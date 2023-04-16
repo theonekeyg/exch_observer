@@ -80,7 +80,7 @@ impl CombinedObserver {
         }
     }
 
-    pub async fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
+    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
         if self.is_running {
             return Ok(());
         }
