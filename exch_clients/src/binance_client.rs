@@ -17,16 +17,32 @@ use log::{info, debug, warn};
 pub struct BinanceClient {
     pub account: Arc<Account>,
     pub market: Arc<Market>,
-    pub runtime: Arc<Runtime>,
+    pub runtime: Option<Arc<Runtime>>,
 }
 
 impl BinanceClient {
-    pub fn new(api_key: Option<String>, secret_key: Option<String>, async_runner: Arc<Runtime>) -> Self {
+    pub fn new(api_key: Option<String>, secret_key: Option<String>) -> Self {
         Self {
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
             market: Arc::new(Market::new(api_key, secret_key)),
-            runtime: async_runner,
+            runtime: None,
         }
+    }
+
+    pub fn new_with_runtime(api_key: Option<String>, secret_key: Option<String>, async_runner: Arc<Runtime>) -> Self {
+        Self {
+            account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
+            market: Arc::new(Market::new(api_key, secret_key)),
+            runtime: Some(async_runner),
+        }
+    }
+
+    pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
+        self.runtime = Some(runtime);
+    }
+
+    pub fn has_runtime(&self) -> bool {
+        self.runtime.is_some()
     }
 
     fn buy_order(
@@ -116,15 +132,25 @@ impl ExchangeClient for BinanceClient {
     }
 
     fn buy_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64) {
+        let runtime = if let Some(runtime) = &self.runtime {
+            runtime.clone()
+        } else {
+            panic!("No runtime set for BinanceClient, cannot execute buy order");
+        };
         Self::buy_order(
-            &self.runtime, self.account.clone(),
+            &runtime, self.account.clone(),
             symbol.clone(), qty, price
         );
     }
 
     fn sell_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64) {
+        let runtime = if let Some(runtime) = &self.runtime {
+            runtime.clone()
+        } else {
+            panic!("No runtime set for BinanceClient, cannot execute sell order");
+        };
         Self::sell_order(
-            &self.runtime, self.account.clone(),
+            &runtime, self.account.clone(),
             symbol.clone(), qty, price
         );
     }

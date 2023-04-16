@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, RwLock
     },
     ops::Deref,
     vec::Vec,
@@ -96,12 +96,12 @@ pub struct BinanceObserver {
     price_table: Arc<HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>>,
     is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>,
     config: BinanceConfig,
-    client: Option<Arc<Box<dyn ExchangeClient>>>,
+    client: Option<Arc<RwLock<BinanceClient>>>,
     async_runner: Arc<Runtime>,
 }
 
 impl BinanceObserver {
-    pub fn new(config: BinanceConfig, client: Option<Arc<Box<dyn ExchangeClient>>>, async_runner: Arc<Runtime>) -> Self {
+    pub fn new(config: BinanceConfig, client: Option<Arc<RwLock<BinanceClient>>>, async_runner: Arc<Runtime>) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
@@ -171,7 +171,7 @@ impl BinanceObserver {
 
     fn add_watching_symbol(&mut self, symbol: &ExchangeSymbol) {
         if let Some(client) = &self.client {
-            if !client.symbol_exists(*&symbol) {
+            if !client.read().unwrap().symbol_exists(*&symbol) {
                 warn!(
                     "Added trading pair `{}` doesn't exist on binance, skip it",
                     symbol

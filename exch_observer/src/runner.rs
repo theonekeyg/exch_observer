@@ -21,20 +21,20 @@ pub struct ObserverRunner {
 
 impl ObserverRunner {
     pub fn new(config: ObserverConfig) -> Self {
+        let mut observer = CombinedObserver::new(config.clone());
+
         let async_runtime = Arc::new(
             RuntimeBuilder::new_multi_thread()
                 .worker_threads(config.num_threads.unwrap_or(4))
+                .enable_io()
                 .build()
                 .unwrap()
         );
-        let observer = Arc::new(
-            RwLock::new(
-                CombinedObserver::new(config.clone(), async_runtime.clone())
-            )
-        );
+
+        observer.set_runtime(async_runtime.clone());
 
         Self {
-            main_observer: observer,
+            main_observer: Arc::new(RwLock::new(observer)),
             config: config,
             runtime: async_runtime
         }

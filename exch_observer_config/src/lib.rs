@@ -1,6 +1,7 @@
 use std::{
     fs::File,
-    io::Read
+    io::Read,
+    default::Default
 };
 use exch_observer_types::{ExchangeSymbol, ExchangeObserver};
 use serde::Deserialize;
@@ -12,10 +13,19 @@ pub struct BinanceConfig {
     pub symbols_path: String,
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RpcConfig {
     pub port: Option<u16>,
     pub host: Option<String>
+}
+
+impl Default for RpcConfig {
+    fn default() -> Self {
+        Self {
+            port: Some(51011),
+            host: Some("127.0.0.1".to_string())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -40,7 +50,12 @@ impl ObserverConfig {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
 
-        let config: Self = toml::from_str(&contents)?;
+        let mut config: Self = toml::from_str(&contents)?;
+
+        if config.rpc.is_none() {
+            config.rpc = Some(RpcConfig::default());
+        }
+
         Ok(config)
     }
 }

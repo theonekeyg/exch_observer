@@ -3,6 +3,7 @@ mod observer_rpc {
 }
 use observer_rpc::{
     exch_observer_server::{ExchObserver, ExchObserverServer},
+    exch_observer_client::ExchObserverClient,
     GetPriceRequest, GetPriceResponse,
 };
 
@@ -18,7 +19,7 @@ use tonic::{
     transport::Server,
     Request, Response, Status
 };
-use log::info;
+use log::{info, debug};
 use tokio::runtime::Runtime;
 
 pub struct GrpcObserver {
@@ -51,6 +52,10 @@ impl ExchObserver for GrpcObserver {
         &self,
         request: Request<GetPriceRequest>,
     ) -> Result<Response<GetPriceResponse>, Status> {
+        info!(
+            "processing request for symbol {}{}",
+            request.get_ref().base, request.get_ref().quote
+        );
 
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
@@ -71,6 +76,10 @@ impl ExchObserver for GrpcObserver {
             _ => ExchangeObserverKind::Unknown,
         };
 
+        info!(
+            "Received price request for symbol {} on exchange {}",
+            symbol, request.exchange
+        );
         let price = observer.get_price(exchange, &symbol).unwrap_or(0.0);
 
         Ok(Response::new(GetPriceResponse {
@@ -91,8 +100,10 @@ unsafe impl Sync for ObserverRpcRunner {}
 
 impl ObserverRpcRunner {
     pub fn new(observer: &Arc<RwLock<CombinedObserver>>, config: RpcConfig) -> Self {
+        let mut rpc = GrpcObserver::new(observer.clone());
+
         Self {
-            rpc: Arc::new(GrpcObserver::new(observer.clone())),
+            rpc: Arc::new(rpc),
             config: config,
         }
     }
@@ -100,17 +111,49 @@ impl ObserverRpcRunner {
     pub async fn run(&mut self) {
         let addr: SocketAddr = format!(
             "{}:{}",
-            self.config.host.get_or_insert("[::1]".into()),
-            self.config.port.get_or_insert(50051)
+            self.config.host.as_ref().unwrap(),
+            self.config.port.as_ref().unwrap()
         )
             .parse()
             .unwrap();
-        info!("Starting RPC service");
+        info!("Starting RPC service on {}", addr);
 
         Server::builder()
             .add_service(ExchObserverServer::from_arc(self.rpc.clone()))
             .serve(addr)
             .await
             .unwrap();
+    }
+}
+
+pub struct ObserverRpcClient {
+    inner: ExchObserverClient<tonic::transport::Channel>,
+    config: RpcConfig
+}
+
+impl ObserverRpcClient {
+    pub async fn new(config: RpcConfig) -> Self {
+        let addr = format!(
+            "http://{}:{}",
+            config.host.as_ref().unwrap(),
+            config.port.unwrap()
+        );
+        let mut client = ExchObserverClient::connect(addr).await.unwrap();
+
+        Self {
+            inner: client,
+            config: config
+        }
+    }
+
+    pub async fn get_price(&mut self, exchange: &str, base: &str, quote: &str) -> f64 {
+        debug!("Fetching price for symbol {}{} on exchange {}", base, quote, exchange);
+        let res = self.inner.get_price(GetPriceRequest {
+            exchange: exchange.to_string(),
+            base: base.to_string(),
+            quote: quote.to_string()
+        }).await.unwrap();
+
+        res.into_inner().price
     }
 }

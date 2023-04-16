@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.27.0", features = ["full"] }
-binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
-log = "0.4.17"
-env_logger = "0.10.0"
+tokio = { workspace = true }
+binance = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
 exch_observer_types = { workspace = true }
 exch_observer_config = { workspace = true }
 exch_subobservers = { workspace = true }
