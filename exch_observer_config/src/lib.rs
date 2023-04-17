@@ -28,18 +28,23 @@ impl Default for RpcConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct ObserverConfig {
+    pub binance: Option<BinanceConfig>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExchObserverConfig {
     pub num_threads: Option<usize>,
-    pub binance: Option<BinanceConfig>,
+    pub observer: ObserverConfig,
     pub rpc: Option<RpcConfig>
 }
 
-impl ObserverConfig {
+impl ExchObserverConfig {
     pub fn new() -> Self {
         Self {
             num_threads: None,
-            binance: None,
+            observer: ObserverConfig::default(),
             rpc: None
         }
     }

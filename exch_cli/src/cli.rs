@@ -1,7 +1,7 @@
 use std::{
     sync::{Arc, RwLock},
 };
-use exch_observer_config::ObserverConfig;
+use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::{ObserverRpcRunner, ObserverRpcClient};
 use exch_observer::ObserverRunner;
 use clap::{
@@ -48,7 +48,7 @@ impl ExchCli {
     }
 
     pub fn fetch_symbol(&self, config: String, network: String, base: String, quote: String) {
-        let config = ObserverConfig::parse_config(config).unwrap();
+        let config = ExchObserverConfig::parse_config(config).unwrap();
         let rpc_config = config.rpc.clone().unwrap_or_default();
         let runtime = RuntimeBuilder::new_multi_thread()
             .enable_all()
@@ -63,7 +63,7 @@ impl ExchCli {
     }
 
     pub fn launch(&self, config: String) {
-        let config = ObserverConfig::parse_config(config).unwrap();
+        let config = ExchObserverConfig::parse_config(config).unwrap();
         println!("{:?}", config);
         let mut obs = ObserverRunner::new(config);
         obs.launch().unwrap();

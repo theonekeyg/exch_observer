@@ -14,7 +14,6 @@ use crate::BinanceObserver;
 
 struct ExchangeClientsTuple {
     pub binance_client: Option<Arc<RwLock<BinanceClient>>>
-    // TODO: Implement this struct to replace `observers` field in `CombinedObserver` struct. 
 }
 
 impl ExchangeClientsTuple {
