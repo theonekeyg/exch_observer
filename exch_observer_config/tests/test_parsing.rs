@@ -1,10 +1,9 @@
-use exch_observer_config::{ExchObserverConfig, BinanceConfig};
+use exch_observer_config::{BinanceConfig, ExchObserverConfig};
 
 #[test]
 fn test_config_parsing() {
     let config =
-        ExchObserverConfig::parse_config("tests/assets/valid_config.toml".to_string())
-        .unwrap();
+        ExchObserverConfig::parse_config("tests/assets/valid_config.toml".to_string()).unwrap();
     println!("{:#?}", config);
 
     assert!(config.observer.binance.is_some());

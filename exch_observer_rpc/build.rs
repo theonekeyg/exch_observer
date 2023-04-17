@@ -8,6 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile(
             &["proto/observer.proto"],
             &["proto"], // specify the root location to search proto dependencies
-        ).unwrap();
+        )
+        .unwrap();
     Ok(())
 }

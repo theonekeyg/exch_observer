@@ -1,10 +1,7 @@
-
 use clap::Parser;
 use dotenvy::dotenv;
 
-use exch_cli::{ExchCli};
-
-
+use exch_cli::ExchCli;
 
 fn main() {
     dotenv().ok();

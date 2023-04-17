@@ -1,13 +1,9 @@
+use binance::{account::OrderSide, model::Balance as BinanceBalance};
 use std::{
-    hash::{Hash, Hasher},
     fmt::{self, Display, Formatter},
+    hash::{Hash, Hasher},
     sync::{Arc, Mutex},
 };
-use binance::{
-    account::OrderSide,
-    model::Balance as BinanceBalance
-};
-
 
 #[derive(Debug, Clone)]
 pub struct ExchangeSymbol {

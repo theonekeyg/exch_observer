@@ -2,27 +2,27 @@ use binance::{
     errors::Result as BResult,
     websockets::{WebSockets, WebsocketEvent},
 };
-use log::{info, trace, debug};
+use csv::Reader;
+use log::warn;
+use log::{debug, info, trace};
 use std::{
     collections::HashMap,
+    ops::Deref,
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex, RwLock
+        Arc, Mutex, RwLock,
     },
-    ops::Deref,
     vec::Vec,
 };
-use tokio::runtime::{Runtime};
-use csv::Reader;
-use log::warn;
+use tokio::runtime::Runtime;
 
-use exch_observer_types::{
-    ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
-    SwapOrder, ExchangeObserver, ExchangeClient
-};
-use exch_observer_config::BinanceConfig;
 use exch_clients::BinanceClient;
+use exch_observer_config::BinanceConfig;
+use exch_observer_types::{
+    ExchangeClient, ExchangeObserver, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
+    SwapOrder,
+};
 
 #[allow(unused)]
 fn all_ticker_stream() -> &'static str {
@@ -101,7 +101,11 @@ pub struct BinanceObserver {
 }
 
 impl BinanceObserver {
-    pub fn new(config: BinanceConfig, client: Option<Arc<RwLock<BinanceClient>>>, async_runner: Arc<Runtime>) -> Self {
+    pub fn new(
+        config: BinanceConfig,
+        client: Option<Arc<RwLock<BinanceClient>>>,
+        async_runner: Arc<Runtime>,
+    ) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
@@ -109,7 +113,7 @@ impl BinanceObserver {
             is_running_table: Arc::new(HashMap::new()),
             config: config,
             client: client,
-            async_runner: async_runner
+            async_runner: async_runner,
         }
     }
 

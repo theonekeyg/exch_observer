@@ -2,25 +2,21 @@ mod observer_rpc {
     include!("myproto/exch_observer_rpc.rs");
 }
 use observer_rpc::{
-    exch_observer_server::{ExchObserver, ExchObserverServer},
     exch_observer_client::ExchObserverClient,
+    exch_observer_server::{ExchObserver, ExchObserverServer},
     GetPriceRequest, GetPriceResponse,
 };
 
-use std::{
-    sync::{Arc, RwLock},
-    net::SocketAddr,
-    marker::Sync
-};
-use exch_subobservers::CombinedObserver;
 use exch_observer_config::RpcConfig;
-use exch_observer_types::{ExchangeSymbol, ExchangeObserverKind};
-use tonic::{
-    transport::Server,
-    Request, Response, Status
+use exch_observer_types::{ExchangeObserverKind, ExchangeSymbol};
+use exch_subobservers::CombinedObserver;
+use log::{debug, info};
+use std::{
+    marker::Sync,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
 };
-use log::{info, debug};
-
+use tonic::{transport::Server, Request, Response, Status};
 
 pub struct GrpcObserver {
     observer: Arc<RwLock<CombinedObserver>>,
@@ -28,7 +24,9 @@ pub struct GrpcObserver {
 
 impl GrpcObserver {
     pub fn new(observer: Arc<RwLock<CombinedObserver>>) -> Self {
-        Self { observer: observer.clone() }
+        Self {
+            observer: observer.clone(),
+        }
     }
 
     pub fn setup(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -54,7 +52,8 @@ impl ExchObserver for GrpcObserver {
     ) -> Result<Response<GetPriceResponse>, Status> {
         info!(
             "processing request for symbol {}{}",
-            request.get_ref().base, request.get_ref().quote
+            request.get_ref().base,
+            request.get_ref().quote
         );
 
         let observer = self.observer.read().unwrap();
@@ -85,7 +84,7 @@ impl ExchObserver for GrpcObserver {
         Ok(Response::new(GetPriceResponse {
             base: request.base,
             quote: request.quote,
-            price: price
+            price: price,
         }))
     }
 }
@@ -114,8 +113,8 @@ impl ObserverRpcRunner {
             self.config.host.as_ref().unwrap(),
             self.config.port.as_ref().unwrap()
         )
-            .parse()
-            .unwrap();
+        .parse()
+        .unwrap();
         info!("Starting RPC service on {}", addr);
 
         Server::builder()
@@ -139,18 +138,23 @@ impl ObserverRpcClient {
         );
         let client = ExchObserverClient::connect(addr).await.unwrap();
 
-        Self {
-            inner: client
-        }
+        Self { inner: client }
     }
 
     pub async fn get_price(&mut self, exchange: &str, base: &str, quote: &str) -> f64 {
-        debug!("Fetching price for symbol {}{} on exchange {}", base, quote, exchange);
-        let res = self.inner.get_price(GetPriceRequest {
-            exchange: exchange.to_string(),
-            base: base.to_string(),
-            quote: quote.to_string()
-        }).await.unwrap();
+        debug!(
+            "Fetching price for symbol {}{} on exchange {}",
+            base, quote, exchange
+        );
+        let res = self
+            .inner
+            .get_price(GetPriceRequest {
+                exchange: exchange.to_string(),
+                base: base.to_string(),
+                quote: quote.to_string(),
+            })
+            .await
+            .unwrap();
 
         res.into_inner().price
     }

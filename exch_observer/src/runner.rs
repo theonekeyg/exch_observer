@@ -1,18 +1,15 @@
-use std::{
-    sync::{Arc, RwLock}
-};
 use log::info;
+use std::sync::{Arc, RwLock};
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 use exch_observer_config::ExchObserverConfig;
-use exch_subobservers::CombinedObserver;
 use exch_observer_rpc::ObserverRpcRunner;
-
+use exch_subobservers::CombinedObserver;
 
 pub struct ObserverRunner {
     pub main_observer: Arc<RwLock<CombinedObserver>>,
     pub config: ExchObserverConfig,
-    pub runtime: Arc<Runtime>
+    pub runtime: Arc<Runtime>,
 }
 
 impl ObserverRunner {
@@ -24,7 +21,7 @@ impl ObserverRunner {
                 .worker_threads(config.num_threads.unwrap_or(4))
                 .enable_io()
                 .build()
-                .unwrap()
+                .unwrap(),
         );
 
         observer.write().unwrap().set_runtime(async_runtime.clone());
@@ -32,7 +29,7 @@ impl ObserverRunner {
         Self {
             main_observer: observer,
             config: config,
-            runtime: async_runtime
+            runtime: async_runtime,
         }
     }
 
@@ -40,7 +37,7 @@ impl ObserverRunner {
         return &self.runtime;
     }
 
-    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
+    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.main_observer.write().unwrap().launch().unwrap();
         // let observer_handle = observer_binding.launch();
         // let observer_handle = observer_binding.launch();
@@ -49,7 +46,9 @@ impl ObserverRunner {
         // let rpc_handle = Some(self.runtime.spawn(async move { rpc_observer.run(); }));
         let rpc_handle = if let Some(ref rpc_config) = self.config.rpc {
             let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, rpc_config.clone());
-            Some(self.runtime.spawn(async move { rpc_observer.run().await; }))
+            Some(self.runtime.spawn(async move {
+                rpc_observer.run().await;
+            }))
         } else {
             None
         };

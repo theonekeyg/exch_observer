@@ -1,17 +1,12 @@
-use std::{
-    sync::Arc
-};
-use tokio::runtime::{Runtime};
-use exch_observer_types::{
-    ExchangeSymbol,
-    ExchangeBalance, ExchangeClient
-};
 use binance::{
     account::{Account, OrderSide, OrderType, TimeInForce},
     api::Binance,
     market::Market,
 };
-use log::{info};
+use exch_observer_types::{ExchangeBalance, ExchangeClient, ExchangeSymbol};
+use log::info;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 pub struct BinanceClient {
     pub account: Arc<Account>,
@@ -28,7 +23,11 @@ impl BinanceClient {
         }
     }
 
-    pub fn new_with_runtime(api_key: Option<String>, secret_key: Option<String>, async_runner: Arc<Runtime>) -> Self {
+    pub fn new_with_runtime(
+        api_key: Option<String>,
+        secret_key: Option<String>,
+        async_runner: Arc<Runtime>,
+    ) -> Self {
         Self {
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
             market: Arc::new(Market::new(api_key, secret_key)),
@@ -54,7 +53,10 @@ impl BinanceClient {
         let mut symbol: String = symbol.into();
         symbol.make_ascii_uppercase();
         runner.spawn_blocking(move || {
-            info!("calling Buy order on symbol: {}; qty: {}; price: {}", &symbol, qty, price);
+            info!(
+                "calling Buy order on symbol: {}; qty: {}; price: {}",
+                &symbol, qty, price
+            );
             let recipe = account
                 .custom_order::<String, f64>(
                     symbol.clone().into(),
@@ -87,7 +89,10 @@ impl BinanceClient {
         let mut symbol: String = symbol.into();
         symbol.make_ascii_uppercase();
         runner.spawn_blocking(move || {
-            info!("calling Sell order on symbol: {}; qty: {}; price: {}", &symbol, qty, price);
+            info!(
+                "calling Sell order on symbol: {}; qty: {}; price: {}",
+                &symbol, qty, price
+            );
             let recipe = account
                 .custom_order::<String, f64>(
                     symbol.clone().into(),
@@ -121,7 +126,8 @@ impl ExchangeClient for BinanceClient {
     fn get_balance(&self, asset: &String) -> Option<ExchangeBalance> {
         let mut asset: String = asset.into();
         asset.make_ascii_uppercase();
-        let rv = self.account
+        let rv = self
+            .account
             .get_balance(asset.clone())
             .ok()
             .map(|v| Into::<ExchangeBalance>::into(v));
@@ -136,10 +142,7 @@ impl ExchangeClient for BinanceClient {
         } else {
             panic!("No runtime set for BinanceClient, cannot execute buy order");
         };
-        Self::buy_order(
-            &runtime, self.account.clone(),
-            symbol.clone(), qty, price
-        );
+        Self::buy_order(&runtime, self.account.clone(), symbol.clone(), qty, price);
     }
 
     fn sell_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64) {
@@ -148,9 +151,6 @@ impl ExchangeClient for BinanceClient {
         } else {
             panic!("No runtime set for BinanceClient, cannot execute sell order");
         };
-        Self::sell_order(
-            &runtime, self.account.clone(),
-            symbol.clone(), qty, price
-        );
+        Self::sell_order(&runtime, self.account.clone(), symbol.clone(), qty, price);
     }
 }

@@ -1,24 +1,22 @@
+use crate::BinanceObserver;
+use exch_clients::BinanceClient;
+use exch_observer_config::ObserverConfig;
+use exch_observer_types::{ExchangeObserver, ExchangeObserverKind, ExchangeSymbol};
 use std::{
     collections::HashMap,
+    io,
     sync::{Arc, RwLock},
-    io
 };
-use tokio::runtime::{Runtime};
-use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol
-};
-use exch_observer_config::ObserverConfig;
-use exch_clients::BinanceClient;
-use crate::BinanceObserver;
+use tokio::runtime::Runtime;
 
 struct ExchangeClientsTuple {
-    pub binance_client: Option<Arc<RwLock<BinanceClient>>>
+    pub binance_client: Option<Arc<RwLock<BinanceClient>>>,
 }
 
 impl ExchangeClientsTuple {
     pub fn new() -> Self {
         Self {
-            binance_client: None
+            binance_client: None,
         }
     }
 
@@ -33,7 +31,7 @@ pub struct CombinedObserver {
     clients: ExchangeClientsTuple,
     pub is_running: bool,
     pub config: ObserverConfig,
-    pub runtime: Option<Arc<Runtime>>
+    pub runtime: Option<Arc<Runtime>>,
 }
 
 impl CombinedObserver {
@@ -43,7 +41,7 @@ impl CombinedObserver {
             clients: ExchangeClientsTuple::new(),
             is_running: false,
             config: config,
-            runtime: None
+            runtime: None,
         };
 
         // rv.create_clients();
@@ -57,7 +55,7 @@ impl CombinedObserver {
             clients: ExchangeClientsTuple::new(),
             is_running: false,
             config: config,
-            runtime: Some(async_runtime)
+            runtime: Some(async_runtime),
         }
     }
 
@@ -76,7 +74,7 @@ impl CombinedObserver {
         }
     }
 
-    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>>{
+    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.is_running {
             return Ok(());
         }
@@ -84,16 +82,21 @@ impl CombinedObserver {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
-            return Err(Box::new(io::Error::new(io::ErrorKind::Other, "No runtime set")));
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::Other,
+                "No runtime set",
+            )));
         };
 
         if let Some(binance_config) = &self.config.binance {
             let binance_client = self.clients.binance_client.clone();
 
-            let mut binance_observer = BinanceObserver::new(binance_config.clone(), binance_client, runtime);
+            let mut binance_observer =
+                BinanceObserver::new(binance_config.clone(), binance_client, runtime);
             binance_observer.load_symbols_from_csv();
             binance_observer.start()?;
-            self.observers.insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
+            self.observers
+                .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
 
         self.is_running = true;
@@ -101,7 +104,6 @@ impl CombinedObserver {
     }
 
     pub fn get_price(&self, kind: ExchangeObserverKind, symbol: &ExchangeSymbol) -> Option<f64> {
-
         if let Some(observer) = self.observers.get(&kind) {
             if let Some(price) = observer.get_price_from_table(&symbol) {
                 return Some(price.lock().unwrap().base_price);
@@ -119,4 +121,3 @@ impl CombinedObserver {
         None
     }
 }
-
