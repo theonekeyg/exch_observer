@@ -346,4 +346,8 @@ impl ExchangeObserver for BinanceObserver {
             (*runing_table_ptr).remove(&symbol);
         }
     }
+
+    fn get_watching_symbols(&self) -> &'_ Vec<ExchangeSymbol> {
+        return &self.watching_symbols;
+    }
 }

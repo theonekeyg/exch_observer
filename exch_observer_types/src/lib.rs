@@ -147,6 +147,9 @@ pub trait ExchangeObserver {
 
     /// Returns value of certain token to usd if available
     fn get_usd_value(&self, sym: String) -> Option<f64>;
+
+    /// Returns the reference to vector of symbols that are being watched
+    fn get_watching_symbols(&self) -> &'_ Vec<ExchangeSymbol>;
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

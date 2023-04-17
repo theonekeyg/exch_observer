@@ -149,4 +149,13 @@ impl CombinedObserver {
 
         None
     }
+
+    pub fn get_watching_symbols(&self, kind: ExchangeObserverKind)
+        -> Option<&'_ Vec<ExchangeSymbol>> {
+        if let Some(observer) = self.observers.get(&kind) {
+            return Some(observer.get_watching_symbols());
+        }
+
+        None
+    }
 }
