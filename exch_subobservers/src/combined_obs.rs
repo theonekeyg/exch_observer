@@ -1,11 +1,14 @@
 use crate::BinanceObserver;
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
-use exch_observer_types::{ExchangeObserver, ExchangeObserverKind, ExchangeSymbol};
+use exch_observer_types::{
+    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol,
+    ExchangeValues, OrderedExchangeSymbol
+};
 use std::{
     collections::HashMap,
     io,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 use tokio::runtime::Runtime;
 
@@ -108,6 +111,32 @@ impl CombinedObserver {
             if let Some(price) = observer.get_price_from_table(&symbol) {
                 return Some(price.lock().unwrap().base_price);
             }
+        }
+
+        None
+    }
+
+    pub fn remove_symbol(&mut self, kind: ExchangeObserverKind, symbol: ExchangeSymbol) {
+        if let Some(observer) = self.observers.get_mut(&kind) {
+            observer.remove_symbol(symbol);
+        }
+    }
+
+    pub fn add_price_to_monitor(
+        &mut self,
+        kind: ExchangeObserverKind,
+        symbol: &ExchangeSymbol,
+        price: &Arc<Mutex<ExchangeValues>>,
+    ) {
+        if let Some(observer) = self.observers.get_mut(&kind) {
+            observer.add_price_to_monitor(symbol, price);
+        }
+    }
+
+    pub fn get_interchanged_symbols(&self, kind: ExchangeObserverKind, symbol: &String)
+        -> Option<&'_ Vec<OrderedExchangeSymbol>> {
+        if let Some(observer) = self.observers.get(&kind) {
+            return Some(observer.get_interchanged_symbols(symbol));
         }
 
         None
