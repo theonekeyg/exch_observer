@@ -110,5 +110,13 @@ impl CombinedObserver {
 
         None
     }
+
+    pub fn get_usd_value(&self, kind: ExchangeObserverKind, symbol: String) -> Option<f64> {
+        if let Some(observer) = self.observers.get(&kind) {
+            return observer.get_usd_value(symbol);
+        }
+
+        None
+    }
 }
 
