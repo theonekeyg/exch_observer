@@ -1,3 +1,4 @@
-[binance]
-symbols_path = "./assets/binance_symbols.csv"
 num_threads = 4
+
+[observer.binance]
+symbols_path = "./assets/binance_symbols.csv"
