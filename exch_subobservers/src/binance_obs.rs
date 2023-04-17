@@ -13,7 +13,7 @@ use std::{
     ops::Deref,
     vec::Vec,
 };
-use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use tokio::runtime::{Runtime};
 use csv::Reader;
 use log::warn;
 

@@ -1,15 +1,10 @@
-use std::{
-    sync::{Arc, RwLock},
-};
+
 use clap::Parser;
 use dotenvy::dotenv;
-use exch_observer::ObserverRunner;
-use exch_cli::{ExchCli, ExchCliCommand};
-use exch_clients::BinanceClient;
-use binance::{
-    account::Account,
-    api::Binance
-};
+
+use exch_cli::{ExchCli};
+
+
 
 fn main() {
     dotenv().ok();

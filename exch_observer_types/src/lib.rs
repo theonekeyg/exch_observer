@@ -1,14 +1,13 @@
 use std::{
-    collections::HashMap,
     hash::{Hash, Hasher},
     fmt::{self, Display, Formatter},
-    sync::{Arc, Mutex, atomic::AtomicBool},
+    sync::{Arc, Mutex},
 };
 use binance::{
     account::OrderSide,
     model::Balance as BinanceBalance
 };
-use tokio::runtime::Runtime;
+
 
 #[derive(Debug, Clone)]
 pub struct ExchangeSymbol {

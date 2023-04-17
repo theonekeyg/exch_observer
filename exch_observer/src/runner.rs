@@ -1,17 +1,13 @@
 use std::{
-    collections::HashMap,
-    fmt::Debug,
     sync::{Arc, RwLock}
 };
 use log::info;
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
-use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeClient
-};
+
 use exch_observer_config::ExchObserverConfig;
 use exch_subobservers::CombinedObserver;
 use exch_observer_rpc::ObserverRpcRunner;
-use exch_clients::BinanceClient;
+
 
 pub struct ObserverRunner {
     pub main_observer: Arc<RwLock<CombinedObserver>>,
@@ -21,7 +17,7 @@ pub struct ObserverRunner {
 
 impl ObserverRunner {
     pub fn new(config: ExchObserverConfig) -> Self {
-        let mut observer = Arc::new(RwLock::new(CombinedObserver::new(config.observer.clone())));
+        let observer = Arc::new(RwLock::new(CombinedObserver::new(config.observer.clone())));
 
         let async_runtime = Arc::new(
             RuntimeBuilder::new_multi_thread()

@@ -1,14 +1,12 @@
-use std::{
-    sync::{Arc, RwLock},
-};
+
 use exch_observer_config::ExchObserverConfig;
-use exch_observer_rpc::{ObserverRpcRunner, ObserverRpcClient};
+use exch_observer_rpc::{ObserverRpcClient};
 use exch_observer::ObserverRunner;
 use clap::{
     Parser, Subcommand
 };
-use log::{info, debug};
-use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use log::{debug};
+use tokio::runtime::{Builder as RuntimeBuilder};
 
 #[derive(Debug, Subcommand)]
 pub enum ExchCliCommand {

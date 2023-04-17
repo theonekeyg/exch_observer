@@ -20,7 +20,7 @@ use tonic::{
     Request, Response, Status
 };
 use log::{info, debug};
-use tokio::runtime::Runtime;
+
 
 pub struct GrpcObserver {
     observer: Arc<RwLock<CombinedObserver>>,
@@ -36,7 +36,7 @@ impl GrpcObserver {
 
         if !observer.is_running {
             let mut observer = self.observer.write().unwrap();
-            observer.launch();
+            observer.launch().unwrap();
         }
 
         Ok(())
@@ -100,7 +100,7 @@ unsafe impl Sync for ObserverRpcRunner {}
 
 impl ObserverRpcRunner {
     pub fn new(observer: &Arc<RwLock<CombinedObserver>>, config: RpcConfig) -> Self {
-        let mut rpc = GrpcObserver::new(observer.clone());
+        let rpc = GrpcObserver::new(observer.clone());
 
         Self {
             rpc: Arc::new(rpc),
@@ -128,7 +128,6 @@ impl ObserverRpcRunner {
 
 pub struct ObserverRpcClient {
     inner: ExchObserverClient<tonic::transport::Channel>,
-    config: RpcConfig
 }
 
 impl ObserverRpcClient {
@@ -138,11 +137,10 @@ impl ObserverRpcClient {
             config.host.as_ref().unwrap(),
             config.port.unwrap()
         );
-        let mut client = ExchObserverClient::connect(addr).await.unwrap();
+        let client = ExchObserverClient::connect(addr).await.unwrap();
 
         Self {
-            inner: client,
-            config: config
+            inner: client
         }
     }
 

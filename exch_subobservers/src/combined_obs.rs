@@ -1,12 +1,11 @@
 use std::{
     collections::HashMap,
-    fmt::Debug,
     sync::{Arc, RwLock},
     io
 };
-use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use tokio::runtime::{Runtime};
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeClient
+    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol
 };
 use exch_observer_config::ObserverConfig;
 use exch_clients::BinanceClient;
@@ -23,6 +22,7 @@ impl ExchangeClientsTuple {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_binance_client(&mut self, client: Arc<RwLock<BinanceClient>>) {
         self.binance_client = Some(client);
     }
@@ -39,7 +39,7 @@ pub struct CombinedObserver {
 
 impl CombinedObserver {
     pub fn new(config: ObserverConfig) -> Self {
-        let mut rv = Self {
+        let rv = Self {
             observers: HashMap::new(),
             // clients: HashMap::new(),
             clients: ExchangeClientsTuple::new(),
@@ -68,9 +68,10 @@ impl CombinedObserver {
         self.runtime = Some(runtime);
     }
 
+    #[allow(dead_code)]
     fn create_clients(&mut self) {
         if let Some(binance_config) = &self.config.binance {
-            let mut binance_client = Arc::new(RwLock::new(BinanceClient::new(
+            let binance_client = Arc::new(RwLock::new(BinanceClient::new(
                 binance_config.api_key.clone(),
                 binance_config.api_secret.clone(),
             )));

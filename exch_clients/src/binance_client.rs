@@ -1,18 +1,17 @@
 use std::{
     sync::Arc
 };
-use tokio::runtime::{Runtime, Builder as RuntimeBuilder};
+use tokio::runtime::{Runtime};
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol,
+    ExchangeSymbol,
     ExchangeBalance, ExchangeClient
 };
 use binance::{
     account::{Account, OrderSide, OrderType, TimeInForce},
     api::Binance,
     market::Market,
-    model::{Balance as BinanceBalance, Transaction},
 };
-use log::{info, debug, warn};
+use log::{info};
 
 pub struct BinanceClient {
     pub account: Arc<Account>,

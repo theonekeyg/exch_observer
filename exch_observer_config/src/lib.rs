@@ -3,7 +3,7 @@ use std::{
     io::Read,
     default::Default
 };
-use exch_observer_types::{ExchangeSymbol, ExchangeObserver};
+
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
