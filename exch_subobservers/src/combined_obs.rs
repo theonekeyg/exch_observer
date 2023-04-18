@@ -1,21 +1,31 @@
 use crate::BinanceObserver;
+use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol,
 };
 use std::{
     collections::HashMap,
+    fmt::{Debug, Display},
+    hash::Hash,
     io,
     sync::{Arc, Mutex, RwLock},
 };
 use tokio::runtime::Runtime;
 
-struct ExchangeClientsTuple {
-    pub binance_client: Option<Arc<RwLock<BinanceClient>>>,
+struct ExchangeClientsTuple<Symbol>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+{
+    pub binance_client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
 }
 
-impl ExchangeClientsTuple {
+impl<Symbol> ExchangeClientsTuple<Symbol>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+{
     pub fn new() -> Self {
         Self {
             binance_client: None,
@@ -23,20 +33,48 @@ impl ExchangeClientsTuple {
     }
 
     #[allow(dead_code)]
-    pub fn set_binance_client(&mut self, client: Arc<RwLock<BinanceClient>>) {
+    pub fn set_binance_client(&mut self, client: Arc<RwLock<BinanceClient<Symbol>>>) {
         self.binance_client = Some(client);
     }
 }
 
-pub struct CombinedObserver {
-    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver>>,
-    clients: ExchangeClientsTuple,
+pub struct CombinedObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
+    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol>>>,
+    // TODO: Rewrite `clients` back to dynamic hashmap like `observers`,
+    // turns out we can use `downcast_mut` to get the correct inner type
+    // for each client, so struct functions will be available
+    clients: ExchangeClientsTuple<Symbol>,
     pub is_running: bool,
     pub config: ObserverConfig,
     pub runtime: Option<Arc<Runtime>>,
 }
 
-impl CombinedObserver {
+impl<Symbol> CombinedObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static,
+{
     pub fn new(config: ObserverConfig) -> Self {
         let rv = Self {
             observers: HashMap::new(),
@@ -76,11 +114,7 @@ impl CombinedObserver {
         }
     }
 
-    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.is_running {
-            return Ok(());
-        }
-
+    pub fn create_observers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
@@ -94,12 +128,62 @@ impl CombinedObserver {
             let binance_client = self.clients.binance_client.clone();
 
             let mut binance_observer =
+                BinanceObserver::new(binance_config.clone(), binance_client, runtime.clone());
+            self.observers
+                .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
+        }
+
+        Ok(())
+    }
+
+    pub fn load_symbols(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
+        if let Some(binance_config) = &self.config.binance {
+            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
+                let mut rdr = Reader::from_path(&binance_config.symbols_path).unwrap();
+                for result in rdr.records() {
+                    let result = result.unwrap();
+
+                    let symbol = f(&result);
+                    if symbol.is_none() {
+                        continue;
+                    }
+
+                    let symbol = symbol.unwrap();
+                    observer.add_price_to_monitor(
+                        &symbol,
+                        &Arc::new(Mutex::new(ExchangeValues::new())),
+                    );
+                }
+                // let mut binance_observer = observer
+                //     .as_any()
+                //     .downcast_mut::<BinanceObserver>()
+                //     .unwrap();
+                // binance_observer.load_symbols_from_csv();
+            }
+        }
+    }
+
+    pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.is_running {
+            return Ok(());
+        }
+
+        if let Some(binance_observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
+            binance_observer.start()?;
+        }
+
+        /*
+        if let Some(binance_config) = &self.config.binance {
+            let binance_client = self.clients.binance_client.clone();
+
+            let mut binance_observer =
                 BinanceObserver::new(binance_config.clone(), binance_client, runtime);
-            binance_observer.load_symbols_from_csv();
+            // binance_observer.load_symbols_from_csv();
             binance_observer.start()?;
             self.observers
                 .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
+        */
 
         self.is_running = true;
         Ok(())
@@ -108,7 +192,7 @@ impl CombinedObserver {
     pub fn get_price(
         &self,
         kind: ExchangeObserverKind,
-        symbol: &ExchangeSymbol,
+        symbol: &Symbol,
     ) -> Option<&Arc<Mutex<ExchangeValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_price_from_table(&symbol);
@@ -117,7 +201,7 @@ impl CombinedObserver {
         None
     }
 
-    pub fn remove_symbol(&mut self, kind: ExchangeObserverKind, symbol: ExchangeSymbol) {
+    pub fn remove_symbol(&mut self, kind: ExchangeObserverKind, symbol: Symbol) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.remove_symbol(symbol);
         }
@@ -126,7 +210,7 @@ impl CombinedObserver {
     pub fn add_price_to_monitor(
         &mut self,
         kind: ExchangeObserverKind,
-        symbol: &ExchangeSymbol,
+        symbol: &Symbol,
         price: &Arc<Mutex<ExchangeValues>>,
     ) {
         if let Some(observer) = self.observers.get_mut(&kind) {
@@ -138,7 +222,7 @@ impl CombinedObserver {
         &self,
         kind: ExchangeObserverKind,
         symbol: &String,
-    ) -> Option<&'_ Vec<OrderedExchangeSymbol>> {
+    ) -> Option<&'_ Vec<OrderedExchangeSymbol<Symbol>>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_interchanged_symbols(symbol));
         }
@@ -154,10 +238,7 @@ impl CombinedObserver {
         None
     }
 
-    pub fn get_watching_symbols(
-        &self,
-        kind: ExchangeObserverKind,
-    ) -> Option<&'_ Vec<ExchangeSymbol>> {
+    pub fn get_watching_symbols(&self, kind: ExchangeObserverKind) -> Option<&'_ Vec<Symbol>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_watching_symbols());
         }

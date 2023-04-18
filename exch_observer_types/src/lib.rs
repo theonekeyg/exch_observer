@@ -1,14 +1,30 @@
 use binance::{account::OrderSide, model::Balance as BinanceBalance};
 use std::{
+    fmt::Debug,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
 };
 
+pub trait PairedExchangeSymbol {
+    fn base(&self) -> &str;
+    fn quote(&self) -> &str;
+}
+
 #[derive(Debug, Clone)]
 pub struct ExchangeSymbol {
     pub base: String,
     pub quote: String,
+}
+
+impl PairedExchangeSymbol for ExchangeSymbol {
+    fn base(&self) -> &str {
+        &self.base
+    }
+
+    fn quote(&self) -> &str {
+        &self.quote
+    }
 }
 
 impl Hash for ExchangeSymbol {
@@ -82,13 +98,13 @@ impl Into<OrderSide> for SwapOrder {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
-pub struct OrderedExchangeSymbol {
-    pub symbol: ExchangeSymbol,
+pub struct OrderedExchangeSymbol<Symbol: Eq + Hash> {
+    pub symbol: Symbol,
     pub order: SwapOrder,
 }
 
-impl OrderedExchangeSymbol {
-    pub fn new(symbol: &ExchangeSymbol, order: SwapOrder) -> Self {
+impl<Symbol: Eq + Hash + Clone> OrderedExchangeSymbol<Symbol> {
+    pub fn new(symbol: &Symbol, order: SwapOrder) -> Self {
         Self {
             symbol: symbol.clone(),
             order: order,
@@ -120,36 +136,36 @@ impl ExchangeValues {
     }
 }
 
-pub trait ExchangeObserver {
+pub trait ExchangeObserver<Symbol: Eq + Hash> {
     // Appropriate fields for your observer:
     //
-    // watching_symbols: Vec<ExchangeSymbol>;
+    // watching_symbols: Vec<Symbol>;
     // symbols_maptree: HashMap<String, Vec<OrderedExchangeSymbol>>;
-    // price_table: Arc<HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>>;
-    // is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>;
+    // price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>;
+    // is_running_table: Arc<HashMap<Symbol, AtomicBool>>;
     // async_runner: Runtime;
 
     /// Get all pools in which this symbol appears, very useful for most strategies
-    fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol>;
+    fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>>;
 
     /// Adds price to the monitor
-    fn add_price_to_monitor(&mut self, symbol: &ExchangeSymbol, price: &Arc<Mutex<ExchangeValues>>);
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<ExchangeValues>>);
 
     /// Fetches price on certain symbol from the observer
-    fn get_price_from_table(&self, symbol: &ExchangeSymbol) -> Option<&Arc<Mutex<ExchangeValues>>>;
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<ExchangeValues>>>;
 
     /// Initialize the runtime, if observer requires one
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Allegedly remove symbol from watching table, if your observer has one, if not,
     /// this might be an nop
-    fn remove_symbol(&mut self, symbol: ExchangeSymbol);
+    fn remove_symbol(&mut self, symbol: Symbol);
 
     /// Returns value of certain token to usd if available
     fn get_usd_value(&self, sym: String) -> Option<f64>;
 
     /// Returns the reference to vector of symbols that are being watched
-    fn get_watching_symbols(&self) -> &'_ Vec<ExchangeSymbol>;
+    fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -186,18 +202,18 @@ impl ExchangeBalance {
     }
 }
 
-pub trait ExchangeClient {
+pub trait ExchangeClient<Symbol: Eq + Hash> {
     /// Checks if symbol exists on the exchange
-    fn symbol_exists(&self, symbol: &ExchangeSymbol) -> bool;
+    fn symbol_exists(&self, symbol: &Symbol) -> bool;
 
     /// Fetches the balance of the current logged in user
     fn get_balance(&self, asset: &String) -> Option<ExchangeBalance>;
 
     /// Makes buy order on the exchange
-    fn buy_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64);
+    fn buy_order(&self, symbol: &Symbol, qty: f64, price: f64);
 
     /// Makes sell order on the exchange
-    fn sell_order(&self, symbol: &ExchangeSymbol, qty: f64, price: f64);
+    fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64);
 }
 
 impl Into<ExchangeBalance> for BinanceBalance {

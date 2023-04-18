@@ -19,11 +19,11 @@ use std::{
 use tonic::{transport::Server, Request, Response, Status};
 
 pub struct GrpcObserver {
-    observer: Arc<RwLock<CombinedObserver>>,
+    observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
 }
 
 impl GrpcObserver {
-    pub fn new(observer: Arc<RwLock<CombinedObserver>>) -> Self {
+    pub fn new(observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>) -> Self {
         Self {
             observer: observer.clone(),
         }
@@ -103,7 +103,10 @@ unsafe impl Send for ObserverRpcRunner {}
 unsafe impl Sync for ObserverRpcRunner {}
 
 impl ObserverRpcRunner {
-    pub fn new(observer: &Arc<RwLock<CombinedObserver>>, config: RpcConfig) -> Self {
+    pub fn new(
+        observer: &Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        config: RpcConfig,
+    ) -> Self {
         let rpc = GrpcObserver::new(observer.clone());
 
         Self {

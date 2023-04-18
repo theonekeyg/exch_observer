@@ -7,6 +7,8 @@ use log::warn;
 use log::{debug, info, trace};
 use std::{
     collections::HashMap,
+    fmt::{Debug, Display},
+    hash::Hash,
     ops::Deref,
     str::FromStr,
     sync::{
@@ -21,7 +23,7 @@ use exch_clients::BinanceClient;
 use exch_observer_config::BinanceConfig;
 use exch_observer_types::{
     ExchangeClient, ExchangeObserver, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
-    SwapOrder,
+    PairedExchangeSymbol, SwapOrder,
 };
 
 #[allow(unused)]
@@ -90,20 +92,26 @@ fn diff_book_depth_stream(symbol: &str, update_speed: u16) -> String {
 
 static BINANCE_USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
-pub struct BinanceObserver {
-    pub watching_symbols: Vec<ExchangeSymbol>,
-    pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol>>,
-    price_table: Arc<HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>>,
-    is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>,
+pub struct BinanceObserver<Symbol>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+{
+    pub watching_symbols: Vec<Symbol>,
+    pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
+    price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>,
+    is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     config: BinanceConfig,
-    client: Option<Arc<RwLock<BinanceClient>>>,
+    client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 }
 
-impl BinanceObserver {
+impl<Symbol> BinanceObserver<Symbol>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+{
     pub fn new(
         config: BinanceConfig,
-        client: Option<Arc<RwLock<BinanceClient>>>,
+        client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
         async_runner: Arc<Runtime>,
     ) -> Self {
         Self {
@@ -119,14 +127,11 @@ impl BinanceObserver {
 
     fn launch_worker(
         runner: &Runtime,
-        symbol: ExchangeSymbol,
+        symbol: Symbol,
         update_value: Arc<Mutex<ExchangeValues>>,
-        is_running_table: Arc<HashMap<ExchangeSymbol, AtomicBool>>,
+        is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let ws_query_sub = kline_stream(
-            &<ExchangeSymbol as Into<String>>::into(symbol.clone()),
-            "1s",
-        );
+        let ws_query_sub = kline_stream(&<Symbol as Into<String>>::into(symbol.clone()), "1s");
         runner.spawn_blocking(move || {
             let mut websock = WebSockets::new(move |event: WebsocketEvent| -> BResult<()> {
                 match event {
@@ -158,6 +163,7 @@ impl BinanceObserver {
         Ok(())
     }
 
+    /*
     /// This function expects the containing self.config_symbols_path file to be in the following
     /// csv format:
     /// * base: <base symbol>,
@@ -186,18 +192,27 @@ impl BinanceObserver {
 
         self.add_price_to_monitor(symbol, &Arc::new(Mutex::new(ExchangeValues::new())));
     }
+    */
 }
 
-impl ExchangeObserver for BinanceObserver {
-    fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol> {
+impl<Symbol> ExchangeObserver<Symbol> for BinanceObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static,
+{
+    fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>> {
         &self.connected_symbols.get::<String>(symbol).unwrap()
     }
 
-    fn add_price_to_monitor(
-        &mut self,
-        symbol: &ExchangeSymbol,
-        price: &Arc<Mutex<ExchangeValues>>,
-    ) {
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<ExchangeValues>>) {
         if !self.price_table.contains_key(&symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
             // thread, we're not required to lock the whole HashMap, since each thread modifies
@@ -207,26 +222,26 @@ impl ExchangeObserver for BinanceObserver {
             // other options to expose that logic to the compiler.
             unsafe {
                 let ptable_ptr = Arc::as_ptr(&self.price_table)
-                    as *mut HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>;
+                    as *mut HashMap<Symbol, Arc<Mutex<ExchangeValues>>>;
                 (*ptable_ptr).insert(symbol.clone(), price.clone());
             }
 
-            if !self.connected_symbols.contains_key(&symbol.base) {
+            if !self.connected_symbols.contains_key(symbol.base()) {
                 self.connected_symbols
-                    .insert(symbol.base.clone(), Vec::new());
+                    .insert(symbol.base().to_string().clone(), Vec::new());
             }
 
-            if !self.connected_symbols.contains_key(&symbol.quote) {
+            if !self.connected_symbols.contains_key(symbol.quote()) {
                 self.connected_symbols
-                    .insert(symbol.quote.clone(), Vec::new());
+                    .insert(symbol.quote().to_string().clone(), Vec::new());
             }
 
             self.connected_symbols
-                .get_mut(&symbol.base)
+                .get_mut(symbol.base())
                 .unwrap()
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Sell));
             self.connected_symbols
-                .get_mut(&symbol.quote)
+                .get_mut(symbol.quote())
                 .unwrap()
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
@@ -235,7 +250,7 @@ impl ExchangeObserver for BinanceObserver {
 
             unsafe {
                 let is_running_ptr =
-                    Arc::as_ptr(&self.is_running_table) as *mut HashMap<ExchangeSymbol, AtomicBool>;
+                    Arc::as_ptr(&self.is_running_table) as *mut HashMap<Symbol, AtomicBool>;
                 (*is_running_ptr).insert(symbol.clone(), AtomicBool::new(false));
             }
 
@@ -252,7 +267,7 @@ impl ExchangeObserver for BinanceObserver {
         }
     }
 
-    fn get_price_from_table(&self, symbol: &ExchangeSymbol) -> Option<&Arc<Mutex<ExchangeValues>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<ExchangeValues>>> {
         self.price_table.get(symbol)
     }
 
@@ -267,8 +282,8 @@ impl ExchangeObserver for BinanceObserver {
 
         for ordered_sym in connected.iter() {
             for stable in &BINANCE_USD_STABLES {
-                if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base
-                    || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote
+                if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
+                    || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
                 {
                     return self
                         .get_price_from_table(&ordered_sym.symbol)
@@ -301,7 +316,7 @@ impl ExchangeObserver for BinanceObserver {
         Ok(())
     }
 
-    fn remove_symbol(&mut self, symbol: ExchangeSymbol) {
+    fn remove_symbol(&mut self, symbol: Symbol) {
         // Remove symbol from `watching_symbols`, `connected_symbols` from both base and quote
         // symbols and `price_table`, also stop it's worker by flipping it's bool in
         // `is_running_table`.
@@ -315,7 +330,7 @@ impl ExchangeObserver for BinanceObserver {
         }
 
         // Remove from maptrees.
-        let base_connected = self.connected_symbols.get_mut(&symbol.base).unwrap();
+        let base_connected = self.connected_symbols.get_mut(symbol.base()).unwrap();
         for (i, sym) in base_connected.iter().enumerate() {
             if sym.symbol == symbol {
                 base_connected.remove(i);
@@ -323,7 +338,7 @@ impl ExchangeObserver for BinanceObserver {
             }
         }
 
-        let quote_connected = self.connected_symbols.get_mut(&symbol.quote).unwrap();
+        let quote_connected = self.connected_symbols.get_mut(symbol.quote()).unwrap();
         for (i, sym) in quote_connected.iter().enumerate() {
             if sym.symbol == symbol {
                 quote_connected.remove(i);
@@ -337,17 +352,17 @@ impl ExchangeObserver for BinanceObserver {
 
         // Remove from `price_table` and `is_running_table`
         unsafe {
-            let ptable_ptr = Arc::as_ptr(&self.price_table)
-                as *mut HashMap<ExchangeSymbol, Arc<Mutex<ExchangeValues>>>;
+            let ptable_ptr =
+                Arc::as_ptr(&self.price_table) as *mut HashMap<Symbol, Arc<Mutex<ExchangeValues>>>;
             (*ptable_ptr).remove(&symbol);
 
             let runing_table_ptr =
-                Arc::as_ptr(&self.is_running_table) as *mut HashMap<ExchangeSymbol, AtomicBool>;
+                Arc::as_ptr(&self.is_running_table) as *mut HashMap<Symbol, AtomicBool>;
             (*runing_table_ptr).remove(&symbol);
         }
     }
 
-    fn get_watching_symbols(&self) -> &'_ Vec<ExchangeSymbol> {
+    fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         return &self.watching_symbols;
     }
 }

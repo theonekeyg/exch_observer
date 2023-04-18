@@ -4,10 +4,11 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcRunner;
+use exch_observer_types::ExchangeSymbol;
 use exch_subobservers::CombinedObserver;
 
 pub struct ObserverRunner {
-    pub main_observer: Arc<RwLock<CombinedObserver>>,
+    pub main_observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
     pub config: ExchObserverConfig,
     pub runtime: Arc<Runtime>,
 }
@@ -38,8 +39,16 @@ impl ObserverRunner {
     }
 
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.main_observer.write().unwrap().launch().unwrap();
-        // let observer_handle = observer_binding.launch();
+        {
+            let mut observer = self.main_observer.write().unwrap();
+            observer.create_observers().unwrap();
+            observer.load_symbols(|record| {
+                let base_sym = record.get(1).unwrap();
+                let quote_sym = record.get(2).unwrap();
+                Some(ExchangeSymbol::from(base_sym, quote_sym))
+            });
+            observer.launch().unwrap();
+        }
         // let observer_handle = observer_binding.launch();
 
         // let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, self.config.rpc.clone().unwrap());
