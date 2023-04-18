@@ -2,8 +2,7 @@ use crate::BinanceObserver;
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol,
-    ExchangeValues, OrderedExchangeSymbol
+    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
 };
 use std::{
     collections::HashMap,
@@ -106,11 +105,13 @@ impl CombinedObserver {
         Ok(())
     }
 
-    pub fn get_price(&self, kind: ExchangeObserverKind, symbol: &ExchangeSymbol) -> Option<f64> {
+    pub fn get_price(
+        &self,
+        kind: ExchangeObserverKind,
+        symbol: &ExchangeSymbol,
+    ) -> Option<&Arc<Mutex<ExchangeValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
-            if let Some(price) = observer.get_price_from_table(&symbol) {
-                return Some(price.lock().unwrap().base_price);
-            }
+            return observer.get_price_from_table(&symbol);
         }
 
         None
@@ -133,8 +134,11 @@ impl CombinedObserver {
         }
     }
 
-    pub fn get_interchanged_symbols(&self, kind: ExchangeObserverKind, symbol: &String)
-        -> Option<&'_ Vec<OrderedExchangeSymbol>> {
+    pub fn get_interchanged_symbols(
+        &self,
+        kind: ExchangeObserverKind,
+        symbol: &String,
+    ) -> Option<&'_ Vec<OrderedExchangeSymbol>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_interchanged_symbols(symbol));
         }
@@ -150,8 +154,10 @@ impl CombinedObserver {
         None
     }
 
-    pub fn get_watching_symbols(&self, kind: ExchangeObserverKind)
-        -> Option<&'_ Vec<ExchangeSymbol>> {
+    pub fn get_watching_symbols(
+        &self,
+        kind: ExchangeObserverKind,
+    ) -> Option<&'_ Vec<ExchangeSymbol>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_watching_symbols());
         }

@@ -79,7 +79,12 @@ impl ExchObserver for GrpcObserver {
             "Received price request for symbol {} on exchange {}",
             symbol, request.exchange
         );
-        let price = observer.get_price(exchange, &symbol).unwrap_or(0.0);
+        let price = observer
+            .get_price(exchange, &symbol)
+            .unwrap()
+            .lock()
+            .unwrap()
+            .base_price;
 
         Ok(Response::new(GetPriceResponse {
             base: request.base,
