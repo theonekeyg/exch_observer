@@ -3,7 +3,7 @@ use binance::{
     api::Binance,
     market::Market,
 };
-use exch_observer_types::{ExchangeBalance, ExchangeClient, ExchangeSymbol};
+use exch_observer_types::{ExchangeBalance, ExchangeClient};
 use log::info;
 use std::sync::Arc;
 use std::{

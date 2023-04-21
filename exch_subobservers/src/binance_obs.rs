@@ -2,8 +2,7 @@ use binance::{
     errors::Result as BResult,
     websockets::{WebSockets, WebsocketEvent},
 };
-use csv::Reader;
-use log::warn;
+// use csv::{Reader, StringRecord};
 use log::{debug, info, trace};
 use std::{
     collections::HashMap,
@@ -22,8 +21,7 @@ use tokio::runtime::Runtime;
 use exch_clients::BinanceClient;
 use exch_observer_config::BinanceConfig;
 use exch_observer_types::{
-    ExchangeClient, ExchangeObserver, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder,
+    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
 
 #[allow(unused)]
@@ -94,7 +92,16 @@ static BINANCE_USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
 pub struct BinanceObserver<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + 'static,
 {
     pub watching_symbols: Vec<Symbol>,
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
@@ -107,7 +114,16 @@ where
 
 impl<Symbol> BinanceObserver<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + 'static,
 {
     pub fn new(
         config: BinanceConfig,
@@ -164,22 +180,22 @@ where
     }
 
     /*
-    /// This function expects the containing self.config_symbols_path file to be in the following
-    /// csv format:
-    /// * base: <base symbol>,
-    /// * quote: <quote symbol>
-    pub fn load_symbols_from_csv(&mut self) {
+    pub fn load_symbols_from_csv(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
         let mut rdr = Reader::from_path(&self.config.symbols_path).unwrap();
         for result in rdr.records() {
             let result = result.unwrap();
-            let base_sym = result.get(1).unwrap();
-            let quote_sym = result.get(2).unwrap();
 
-            self.add_watching_symbol(&ExchangeSymbol::new(base_sym, quote_sym));
+            let symbol = f(&result);
+            if symbol.is_none() {
+                continue;
+            }
+
+            let symbol = symbol.unwrap();
+            self.add_watching_symbol(&symbol);
         }
     }
 
-    fn add_watching_symbol(&mut self, symbol: &ExchangeSymbol) {
+    fn add_watching_symbol(&mut self, symbol: &Symbol) {
         if let Some(client) = &self.client {
             if !client.read().unwrap().symbol_exists(*&symbol) {
                 warn!(

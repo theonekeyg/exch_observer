@@ -3,7 +3,7 @@ use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
+    ExchangeObserver, ExchangeObserverKind, ExchangeValues, OrderedExchangeSymbol,
     PairedExchangeSymbol,
 };
 use std::{
@@ -84,8 +84,6 @@ where
             runtime: None,
         };
 
-        // rv.create_clients();
-
         rv
     }
 
@@ -114,6 +112,7 @@ where
         }
     }
 
+    /// Creates observers for each exchange in the config, must be called before `load_symbols`.
     pub fn create_observers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
@@ -127,7 +126,7 @@ where
         if let Some(binance_config) = &self.config.binance {
             let binance_client = self.clients.binance_client.clone();
 
-            let mut binance_observer =
+            let binance_observer =
                 BinanceObserver::new(binance_config.clone(), binance_client, runtime.clone());
             self.observers
                 .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
@@ -136,9 +135,13 @@ where
         Ok(())
     }
 
+    /// Loads symbols in the observer from the config, must be called after `create_observers` and
+    /// before `launch`.
     pub fn load_symbols(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
         if let Some(binance_config) = &self.config.binance {
             if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
+                // let mut observer = observer.downcast_mut::<BinanceObserver<Symbol>>().unwrap();
+                // observer.load_symbols_from_csv(f);
                 let mut rdr = Reader::from_path(&binance_config.symbols_path).unwrap();
                 for result in rdr.records() {
                     let result = result.unwrap();
@@ -154,11 +157,6 @@ where
                         &Arc::new(Mutex::new(ExchangeValues::new())),
                     );
                 }
-                // let mut binance_observer = observer
-                //     .as_any()
-                //     .downcast_mut::<BinanceObserver>()
-                //     .unwrap();
-                // binance_observer.load_symbols_from_csv();
             }
         }
     }
@@ -171,19 +169,6 @@ where
         if let Some(binance_observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
             binance_observer.start()?;
         }
-
-        /*
-        if let Some(binance_config) = &self.config.binance {
-            let binance_client = self.clients.binance_client.clone();
-
-            let mut binance_observer =
-                BinanceObserver::new(binance_config.clone(), binance_client, runtime);
-            // binance_observer.load_symbols_from_csv();
-            binance_observer.start()?;
-            self.observers
-                .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
-        }
-        */
 
         self.is_running = true;
         Ok(())
