@@ -1,4 +1,4 @@
-use crate::BinanceObserver;
+use crate::{HuobiObserver, BinanceObserver};
 use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
@@ -132,6 +132,14 @@ where
                 .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
 
+        if let Some(huobi_config) = &self.config.huobi {
+
+            let huobi_observer =
+                HuobiObserver::new(huobi_config.clone(), runtime.clone());
+            self.observers
+                .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
+        }
+
         Ok(())
     }
 
@@ -159,6 +167,26 @@ where
                 }
             }
         }
+
+        if let Some(huobi_config) = &self.config.huobi {
+            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Huobi) {
+                let mut rdr = Reader::from_path(&huobi_config.symbols_path).unwrap();
+                for result in rdr.records() {
+                    let result = result.unwrap();
+
+                    let symbol = f(&result);
+                    if symbol.is_none() {
+                        continue;
+                    }
+
+                    let symbol = symbol.unwrap();
+                    observer.add_price_to_monitor(
+                        &symbol,
+                        &Arc::new(Mutex::new(ExchangeValues::new())),
+                    );
+                }
+            }
+        }
     }
 
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -168,6 +196,10 @@ where
 
         if let Some(binance_observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
             binance_observer.start()?;
+        }
+
+        if let Some(huobi_observer) = self.observers.get_mut(&ExchangeObserverKind::Huobi) {
+            huobi_observer.start()?;
         }
 
         self.is_running = true;

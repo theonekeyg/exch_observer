@@ -10,6 +10,13 @@ pub struct BinanceConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct HuobiConfig {
+    pub api_key: Option<String>,
+    pub api_secret: Option<String>,
+    pub symbols_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct RpcConfig {
     pub port: Option<u16>,
     pub host: Option<String>,
@@ -27,6 +34,7 @@ impl Default for RpcConfig {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ObserverConfig {
     pub binance: Option<BinanceConfig>,
+    pub huobi: Option<HuobiConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
