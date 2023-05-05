@@ -119,6 +119,15 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
 
         rv
     }
+
+    pub fn get_input_symbol(&self) -> String {
+        let rv = match self.order {
+            SwapOrder::Buy => self.symbol.quote().into(),
+            SwapOrder::Sell => self.symbol.base().into(),
+        };
+
+        rv
+    }
 }
 
 #[derive(Debug, Clone)]

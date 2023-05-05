@@ -14,4 +14,5 @@ fn test_ordered_exchange_symbol_ouput_symbol() {
     let ordered_symbol = OrderedExchangeSymbol::new(&base_symbol, SwapOrder::Buy);
 
     assert_eq!(ordered_symbol.get_output_symbol(), "btc");
+    assert_eq!(ordered_symbol.get_input_symbol(), "usdt");
 }
