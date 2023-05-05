@@ -123,17 +123,17 @@ where
             )));
         };
 
-        if let Some(binance_config) = &self.config.binance {
+        if let Some(_) = &self.config.binance {
             let binance_client = self.clients.binance_client.clone();
 
             let binance_observer =
-                BinanceObserver::new(binance_config.clone(), binance_client, runtime.clone());
+                BinanceObserver::new(binance_client, runtime.clone());
             self.observers
                 .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
 
-        if let Some(huobi_config) = &self.config.huobi {
-            let huobi_observer = HuobiObserver::new(huobi_config.clone(), runtime.clone());
+        if let Some(_) = &self.config.huobi {
+            let huobi_observer = HuobiObserver::new(runtime.clone());
             self.observers
                 .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
         }

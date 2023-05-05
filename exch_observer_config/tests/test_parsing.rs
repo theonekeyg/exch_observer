@@ -1,4 +1,4 @@
-use exch_observer_config::{BinanceConfig, ExchObserverConfig};
+use exch_observer_config::{ExchObserverConfig};
 
 #[test]
 fn test_config_parsing() {

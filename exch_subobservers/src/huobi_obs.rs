@@ -1,5 +1,4 @@
-use exch_apis::websockets::{HuobiWebsocket, KLine, WebsocketEvent};
-use exch_observer_config::HuobiConfig;
+use exch_apis::websockets::{HuobiWebsocket, WebsocketEvent};
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
@@ -11,7 +10,7 @@ use std::{
     ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex, RwLock,
+        Arc, Mutex,
     },
 };
 use tokio::runtime::Runtime;
@@ -40,7 +39,6 @@ where
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
     price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>,
     is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
-    config: HuobiConfig,
     // client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 }
@@ -58,13 +56,12 @@ where
         + PairedExchangeSymbol
         + 'static,
 {
-    pub fn new(config: HuobiConfig, async_runner: Arc<Runtime>) -> Self {
+    pub fn new(async_runner: Arc<Runtime>) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
             is_running_table: Arc::new(HashMap::new()),
-            config: config,
             // client: client,
             async_runner: async_runner,
         }

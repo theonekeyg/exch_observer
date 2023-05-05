@@ -19,7 +19,6 @@ use std::{
 use tokio::runtime::Runtime;
 
 use exch_clients::BinanceClient;
-use exch_observer_config::BinanceConfig;
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
@@ -107,7 +106,7 @@ where
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
     price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>,
     is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
-    config: BinanceConfig,
+    #[allow(dead_code)]
     client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 }
@@ -126,7 +125,6 @@ where
         + 'static,
 {
     pub fn new(
-        config: BinanceConfig,
         client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
         async_runner: Arc<Runtime>,
     ) -> Self {
@@ -135,7 +133,6 @@ where
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
             is_running_table: Arc::new(HashMap::new()),
-            config: config,
             client: client,
             async_runner: async_runner,
         }
@@ -178,37 +175,6 @@ where
 
         Ok(())
     }
-
-    /*
-    pub fn load_symbols_from_csv(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
-        let mut rdr = Reader::from_path(&self.config.symbols_path).unwrap();
-        for result in rdr.records() {
-            let result = result.unwrap();
-
-            let symbol = f(&result);
-            if symbol.is_none() {
-                continue;
-            }
-
-            let symbol = symbol.unwrap();
-            self.add_watching_symbol(&symbol);
-        }
-    }
-
-    fn add_watching_symbol(&mut self, symbol: &Symbol) {
-        if let Some(client) = &self.client {
-            if !client.read().unwrap().symbol_exists(*&symbol) {
-                warn!(
-                    "Added trading pair `{}` doesn't exist on binance, skip it",
-                    symbol
-                );
-                return;
-            }
-        }
-
-        self.add_price_to_monitor(symbol, &Arc::new(Mutex::new(ExchangeValues::new())));
-    }
-    */
 }
 
 impl<Symbol> ExchangeObserver<Symbol> for BinanceObserver<Symbol>

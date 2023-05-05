@@ -1,5 +1,5 @@
 use libflate::gzip::Decoder;
-use log::debug;
+
 use serde::{Deserialize, Serialize};
 use std::{
     io::Read,
@@ -26,8 +26,8 @@ pub struct KLine {
     pub count: f64,
 }
 
-#[serde(untagged)]
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
 pub enum WebsocketEvent {
     KLineEvent(KLine),
 }
@@ -82,14 +82,15 @@ struct HuobiStatusEvent {
     pub ts: u64,
 }
 
-#[serde(untagged)]
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
 enum HuobiWebsocketEvent {
     KLineEvent(HuobiKlineEvent),
     PingEvent(HuobiPingEvent),
     StatusEvent(HuobiStatusEvent),
 }
 
+#[allow(dead_code)]
 enum HuobiConnectionKind {
     Default,
     MultiStream,
@@ -131,6 +132,8 @@ impl<'a> HuobiWebsocket<'a> {
         self.connect_ws(subscription)
     }
 
+    /// Sends a subscription message to the Huobi websocket stream, which is the
+    /// documented way of subscribing to a stream.
     fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
         if let Some(ref mut socket) = self.socket {
             socket.0.write_message(Message::Text(format!(
@@ -173,7 +176,7 @@ impl<'a> HuobiWebsocket<'a> {
                                 )))?;
                                 continue;
                             }
-                            HuobiWebsocketEvent::StatusEvent(event) => {
+                            HuobiWebsocketEvent::StatusEvent(_event) => {
                                 // debug!("Received status event: {:?}", event);
                                 continue;
                             }
