@@ -202,6 +202,7 @@ where
     }
 
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Starting Huobi Observer");
         for symbol in &self.watching_symbols {
             let update_value;
 
