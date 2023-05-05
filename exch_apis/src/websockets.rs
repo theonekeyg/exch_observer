@@ -1,18 +1,15 @@
-use std::{
-    net::TcpStream,
-    io::Read,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering}
-};
-use serde::{Serialize, Deserialize};
-use tungstenite::{
-    protocol::WebSocket,
-    stream::MaybeTlsStream,
-    handshake::client::Response,
-    error::Result as WsResult,
-    connect, Message
-};
 use libflate::gzip::Decoder;
 use log::debug;
+use serde::{Deserialize, Serialize};
+use std::{
+    io::Read,
+    net::TcpStream,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+};
+use tungstenite::{
+    connect, error::Result as WsResult, handshake::client::Response, protocol::WebSocket,
+    stream::MaybeTlsStream, Message,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KLine {
@@ -26,7 +23,7 @@ pub struct KLine {
 
     pub vol: f64,
 
-    pub count: f64
+    pub count: f64,
 }
 
 #[serde(untagged)]
@@ -96,7 +93,7 @@ enum HuobiWebsocketEvent {
 enum HuobiConnectionKind {
     Default,
     MultiStream,
-    Custom(String)
+    Custom(String),
 }
 
 const HUOBI_WS_URL: &str = "wss://api.huobi.pro/ws";
@@ -109,10 +106,12 @@ pub struct HuobiWebsocket<'a> {
 
 impl<'a> HuobiWebsocket<'a> {
     pub fn new<Callback>(handler: Callback) -> Self
-    where Callback: FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a {
+    where
+        Callback: FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a,
+    {
         Self {
             socket: None,
-            handler: Box::new(handler)
+            handler: Box::new(handler),
         }
     }
 
@@ -134,15 +133,20 @@ impl<'a> HuobiWebsocket<'a> {
 
     fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
         if let Some(ref mut socket) = self.socket {
-            socket.0.write_message(Message::Text(
-                format!("{{\"sub\": \"{}\", \"id\": \"id{}\"}}", subscription, HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed))
-            ))?;
+            socket.0.write_message(Message::Text(format!(
+                "{{\"sub\": \"{}\", \"id\": \"id{}\"}}",
+                subscription,
+                HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed)
+            )))?;
         }
 
         Ok(())
     }
 
-    fn create_connection(&self, url: &str) -> WsResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
+    fn create_connection(
+        &self,
+        url: &str,
+    ) -> WsResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
         connect(url)
     }
 
@@ -160,14 +164,15 @@ impl<'a> HuobiWebsocket<'a> {
                         let ws_event = match event {
                             HuobiWebsocketEvent::KLineEvent(event) => {
                                 WebsocketEvent::KLineEvent(event.tick.into())
-                            },
+                            }
                             HuobiWebsocketEvent::PingEvent(event) => {
                                 // debug!("Received ping event: {}", event.ping);
-                                socket.0.write_message(Message::Text(
-                                    format!("{{\"pong\":{}}}", event.ping)
-                                ))?;
+                                socket.0.write_message(Message::Text(format!(
+                                    "{{\"pong\":{}}}",
+                                    event.ping
+                                )))?;
                                 continue;
-                            },
+                            }
                             HuobiWebsocketEvent::StatusEvent(event) => {
                                 // debug!("Received status event: {:?}", event);
                                 continue;
@@ -175,7 +180,7 @@ impl<'a> HuobiWebsocket<'a> {
                         };
 
                         (self.handler)(ws_event).unwrap();
-                    },
+                    }
                     _ => {
                         panic!("Received some other message than binary: {:?}", msg);
                     }
@@ -228,7 +233,7 @@ fn test_huobi_ping() {
     match event {
         HuobiWebsocketEvent::PingEvent(ping_event) => {
             assert_eq!(ping_event.ping, 1682445630232);
-        },
+        }
         _ => {
             panic!("Unexpected event type");
         }

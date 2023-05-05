@@ -103,12 +103,21 @@ pub struct OrderedExchangeSymbol<Symbol: Eq + Hash> {
     pub order: SwapOrder,
 }
 
-impl<Symbol: Eq + Hash + Clone> OrderedExchangeSymbol<Symbol> {
+impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Symbol> {
     pub fn new(symbol: &Symbol, order: SwapOrder) -> Self {
         Self {
             symbol: symbol.clone(),
             order: order,
         }
+    }
+
+    pub fn get_output_symbol(&self) -> String {
+        let rv = match self.order {
+            SwapOrder::Buy => self.symbol.base().into(),
+            SwapOrder::Sell => self.symbol.quote().into(),
+        };
+
+        rv
     }
 }
 

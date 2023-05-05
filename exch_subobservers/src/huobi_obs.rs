@@ -1,20 +1,18 @@
-use std::{
-    hash::Hash,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, RwLock
-    },
-    fmt::{Debug, Display},
-    ops::Deref,
-    collections::HashMap
-};
-use log::{info, debug};
+use exch_apis::websockets::{HuobiWebsocket, KLine, WebsocketEvent};
 use exch_observer_config::HuobiConfig;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder
+    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
-use exch_apis::{
-    websockets::{WebsocketEvent, KLine, HuobiWebsocket}
+use log::{debug, info};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    hash::Hash,
+    ops::Deref,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, RwLock,
+    },
 };
 use tokio::runtime::Runtime;
 
@@ -60,11 +58,7 @@ where
         + PairedExchangeSymbol
         + 'static,
 {
-
-    pub fn new(
-        config: HuobiConfig,
-        async_runner: Arc<Runtime>
-    ) -> Self {
+    pub fn new(config: HuobiConfig, async_runner: Arc<Runtime>) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
@@ -80,7 +74,7 @@ where
         runner: &Runtime,
         symbol: Symbol,
         update_value: Arc<Mutex<ExchangeValues>>,
-        is_running_table: Arc<HashMap<Symbol, AtomicBool>>
+        is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         runner.spawn_blocking(move || {
             let _symbol = symbol.clone();
@@ -98,7 +92,9 @@ where
                 Ok(())
             });
 
-            websock.connect(&kline_stream(&symbol.clone().into(), "1min")).unwrap();
+            websock
+                .connect(&kline_stream(&symbol.clone().into(), "1min"))
+                .unwrap();
             let is_running = is_running_table.get(&symbol).unwrap();
             is_running.store(true, Ordering::Relaxed);
             websock.event_loop(is_running).unwrap();

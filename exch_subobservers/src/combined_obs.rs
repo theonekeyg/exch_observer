@@ -1,4 +1,4 @@
-use crate::{HuobiObserver, BinanceObserver};
+use crate::{BinanceObserver, HuobiObserver};
 use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
@@ -133,9 +133,7 @@ where
         }
 
         if let Some(huobi_config) = &self.config.huobi {
-
-            let huobi_observer =
-                HuobiObserver::new(huobi_config.clone(), runtime.clone());
+            let huobi_observer = HuobiObserver::new(huobi_config.clone(), runtime.clone());
             self.observers
                 .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
         }
