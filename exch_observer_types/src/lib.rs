@@ -76,7 +76,7 @@ impl Display for ExchangeSymbol {
 
 impl Eq for ExchangeSymbol {}
 
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(Debug, Eq, Hash, PartialEq, Copy, Clone)]
 pub enum SwapOrder {
     Sell,
     Buy,
