@@ -267,6 +267,8 @@ where
                 Arc::as_ptr(&self.is_running_table) as *mut HashMap<Symbol, AtomicBool>;
             (*runing_table_ptr).remove(&symbol);
         }
+
+        debug!("Removed symbol {} from Huobi observer", symbol);
     }
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {

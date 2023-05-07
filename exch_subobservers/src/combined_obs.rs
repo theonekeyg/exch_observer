@@ -187,6 +187,31 @@ where
         }
     }
 
+    /// Removes all symbols from the specified observer that are uninitialized at this moment.
+    /// Useful when using exch_observer with trade bot locally, since uninitialized symbols might
+    /// introduce various race-condition issues as well as intruduce potential bugs in
+    /// calculations.
+    pub fn clear_uninitialized_symbols(&mut self, kind: ExchangeObserverKind) {
+
+        if let Some(observer) = self.observers.get_mut(&kind) {
+
+            let mut uninitialized_symbols = Vec::new();
+
+            // Fill uninitialized symbols vector
+            for symbol in observer.get_watching_symbols().clone() {
+                let price = observer.get_price_from_table(&symbol).unwrap();
+                if price.lock().unwrap().base_price == 0.0 {
+                    uninitialized_symbols.push(symbol.clone());
+                }
+            }
+
+            // Remove all uninitialized symbols
+            for symbol in uninitialized_symbols {
+                observer.remove_symbol(symbol);
+            }
+        }
+    }
+
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.is_running {
             return Ok(());
