@@ -160,7 +160,7 @@ where
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
                         let price = (price_high + price_low) / 2.0;
                         update_value.lock().unwrap().update_price(price);
-                        debug!("[{}] Price: {:?}", kline.symbol, price);
+                        trace!("[{}] Price: {:?}", kline.symbol, price);
                     }
                     _ => (),
                 }

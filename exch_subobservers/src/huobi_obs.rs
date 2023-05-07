@@ -2,7 +2,7 @@ use exch_apis::websockets::{HuobiWebsocket, WebsocketEvent};
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
-use log::{debug, info};
+use log::{debug, info, trace};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -82,7 +82,7 @@ where
                         let price_low = kline.low;
                         let price = (price_high + price_low) / 2.0;
                         update_value.lock().unwrap().update_price(price);
-                        debug!("[{}] Price: {:?}", _symbol, price);
+                        trace!("[{}] Price: {:?}", _symbol, price);
                     }
                 }
 
