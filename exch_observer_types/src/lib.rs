@@ -1,3 +1,4 @@
+#![feature(associated_type_defaults)]
 use binance::{account::OrderSide, model::Balance as BinanceBalance};
 use std::{
     fmt::Debug,
@@ -130,27 +131,103 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ExchangeValues {
-    pub base_price: f64,
+pub trait ExchangeValues {
+    type Values = (f64, f64);
+
+    fn update_price(&mut self, price: Self::Values);
+    fn get_ask_price(&self) -> f64;
+    fn get_bid_price(&self) -> f64;
+    fn is_initialized(&self) -> bool;
+    fn showable_price(&self) -> f64;
 }
 
-unsafe impl Send for ExchangeValues {}
-unsafe impl Sync for ExchangeValues {}
+#[derive(Debug, Clone)]
+pub struct ExchangeSingleValues {
+    pub base_price: f64
+}
 
-impl ExchangeValues {
+unsafe impl Send for ExchangeSingleValues {}
+unsafe impl Sync for ExchangeSingleValues {}
+
+impl ExchangeSingleValues {
     pub fn new() -> Self {
         Self { base_price: 0.0 }
     }
 
-    pub fn new_with_price(base_price: f64) -> Self {
+    pub fn new_with_prices(base_price: f64) -> Self {
         Self {
-            base_price: base_price,
+            base_price: base_price
         }
     }
+}
 
-    pub fn update_price(&mut self, base_price: f64) {
-        self.base_price = base_price;
+impl ExchangeValues for ExchangeSingleValues {
+    type Values = f64;
+
+    fn update_price(&mut self, price: Self::Values) {
+        self.base_price = price;
+    }
+
+    fn get_ask_price(&self) -> f64 {
+        self.base_price
+    }
+
+    fn get_bid_price(&self) -> f64 {
+        self.base_price
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.base_price != 0.0
+    }
+
+    fn showable_price(&self) -> f64 {
+        self.base_price
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AskBidValues {
+    pub ask_price: f64,
+    pub bid_price: f64
+}
+unsafe impl Send for AskBidValues {}
+unsafe impl Sync for AskBidValues {}
+
+impl AskBidValues {
+    pub fn new() -> Self {
+        Self { ask_price: 0.0, bid_price: 0.0 }
+    }
+
+    pub fn new_with_prices(ask_price: f64, bid_price: f64) -> Self {
+        Self {
+            ask_price: ask_price,
+            bid_price: bid_price,
+        }
+    }
+}
+
+impl ExchangeValues for AskBidValues {
+    type Values = (f64, f64);
+
+    fn update_price(&mut self, price: Self::Values) {
+        self.ask_price = price.0;
+        self.bid_price = price.1;
+    }
+
+    fn get_ask_price(&self) -> f64 {
+        self.ask_price
+    }
+
+    fn get_bid_price(&self) -> f64 {
+        self.bid_price
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.ask_price != 0.0 && self.bid_price != 0.0
+    }
+
+    fn showable_price(&self) -> f64 {
+        (self.ask_price + self.bid_price) / 2.0
     }
 }
 
@@ -159,18 +236,20 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     //
     // watching_symbols: Vec<Symbol>;
     // symbols_maptree: HashMap<String, Vec<OrderedExchangeSymbol>>;
-    // price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>;
+    // price_table: Arc<HashMap<Symbol, Arc<Mutex<Values>>>>;
     // is_running_table: Arc<HashMap<Symbol, AtomicBool>>;
     // async_runner: Runtime;
+
+    type Values: ExchangeValues;
 
     /// Get all pools in which this symbol appears, very useful for most strategies
     fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>>;
 
     /// Adds price to the monitor
-    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<ExchangeValues>>);
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>);
 
     /// Fetches price on certain symbol from the observer
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<ExchangeValues>>>;
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>>;
 
     /// Initialize the runtime, if observer requires one
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;

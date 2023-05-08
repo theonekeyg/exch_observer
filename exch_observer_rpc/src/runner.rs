@@ -8,7 +8,7 @@ use observer_rpc::{
 };
 
 use exch_observer_config::RpcConfig;
-use exch_observer_types::{ExchangeObserverKind, ExchangeSymbol};
+use exch_observer_types::{ExchangeObserverKind, ExchangeSymbol, ExchangeValues};
 use exch_subobservers::CombinedObserver;
 use log::{debug, info};
 use std::{
@@ -84,7 +84,7 @@ impl ExchObserver for GrpcObserver {
             .unwrap()
             .lock()
             .unwrap()
-            .base_price;
+            .showable_price();
 
         Ok(Response::new(GetPriceResponse {
             base: request.base,

@@ -3,8 +3,8 @@ use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol,
+    ExchangeObserver, ExchangeObserverKind, AskBidValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol, ExchangeValues
 };
 use std::{
     collections::HashMap,
@@ -52,7 +52,7 @@ where
         + Sync
         + 'static,
 {
-    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol>>>,
+    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
     // TODO: Rewrite `clients` back to dynamic hashmap like `observers`,
     // turns out we can use `downcast_mut` to get the correct inner type
     // for each client, so struct functions will be available
@@ -160,7 +160,7 @@ where
                     let symbol = symbol.unwrap();
                     observer.add_price_to_monitor(
                         &symbol,
-                        &Arc::new(Mutex::new(ExchangeValues::new())),
+                        &Arc::new(Mutex::new(AskBidValues::new())),
                     );
                 }
             }
@@ -180,7 +180,7 @@ where
                     let symbol = symbol.unwrap();
                     observer.add_price_to_monitor(
                         &symbol,
-                        &Arc::new(Mutex::new(ExchangeValues::new())),
+                        &Arc::new(Mutex::new(AskBidValues::new())),
                     );
                 }
             }
@@ -200,7 +200,7 @@ where
             // Fill uninitialized symbols vector
             for symbol in observer.get_watching_symbols().clone() {
                 let price = observer.get_price_from_table(&symbol).unwrap();
-                if price.lock().unwrap().base_price == 0.0 {
+                if !price.lock().unwrap().is_initialized() {
                     uninitialized_symbols.push(symbol.clone());
                 }
             }
@@ -233,7 +233,7 @@ where
         &self,
         kind: ExchangeObserverKind,
         symbol: &Symbol,
-    ) -> Option<&Arc<Mutex<ExchangeValues>>> {
+    ) -> Option<&Arc<Mutex<AskBidValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_price_from_table(&symbol);
         }
@@ -251,7 +251,7 @@ where
         &mut self,
         kind: ExchangeObserverKind,
         symbol: &Symbol,
-        price: &Arc<Mutex<ExchangeValues>>,
+        price: &Arc<Mutex<AskBidValues>>,
     ) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.add_price_to_monitor(symbol, price);

@@ -20,7 +20,7 @@ use tokio::runtime::Runtime;
 
 use exch_clients::BinanceClient;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
+    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder, AskBidValues
 };
 
 #[allow(unused)]
@@ -104,7 +104,7 @@ where
 {
     pub watching_symbols: Vec<Symbol>,
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
-    price_table: Arc<HashMap<Symbol, Arc<Mutex<ExchangeValues>>>>,
+    price_table: Arc<HashMap<Symbol, Arc<Mutex<AskBidValues>>>>,
     is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     #[allow(dead_code)]
     client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
@@ -141,7 +141,7 @@ where
     fn launch_worker(
         runner: &Runtime,
         symbol: Symbol,
-        update_value: Arc<Mutex<ExchangeValues>>,
+        update_value: Arc<Mutex<AskBidValues>>,
         is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let ws_query_sub = kline_stream(&<Symbol as Into<String>>::into(symbol.clone()), "1s");
@@ -159,7 +159,9 @@ where
                         let price_high = f64::from_str(kline.high.as_ref()).unwrap();
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
                         let price = (price_high + price_low) / 2.0;
-                        update_value.lock().unwrap().update_price(price);
+                        update_value.lock().unwrap().update_price((price_high, price_low));
+                        // update_value.lock().unwrap().update_ask_price(price_high);
+                        // update_value.lock().unwrap().update_bid_price(price_low);
                         trace!("[{}] Price: {:?}", kline.symbol, price);
                     }
                     _ => (),
@@ -190,11 +192,14 @@ where
         + Sync
         + 'static,
 {
+
+    type Values = AskBidValues;
+
     fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>> {
         &self.connected_symbols.get::<String>(symbol).unwrap()
     }
 
-    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<ExchangeValues>>) {
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>) {
         if !self.price_table.contains_key(&symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
             // thread, we're not required to lock the whole HashMap, since each thread modifies
@@ -204,7 +209,7 @@ where
             // other options to expose that logic to the compiler.
             unsafe {
                 let ptable_ptr = Arc::as_ptr(&self.price_table)
-                    as *mut HashMap<Symbol, Arc<Mutex<ExchangeValues>>>;
+                    as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
                 (*ptable_ptr).insert(symbol.clone(), price.clone());
             }
 
@@ -249,7 +254,7 @@ where
         }
     }
 
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<ExchangeValues>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
         self.price_table.get(symbol)
     }
 
@@ -269,7 +274,10 @@ where
                 {
                     return self
                         .get_price_from_table(&ordered_sym.symbol)
-                        .map(|v| v.lock().unwrap().base_price);
+                        .map(|v| {
+                            let unlocked = v.lock().unwrap();
+                            (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
+                        });
                 }
             }
         }
@@ -336,7 +344,7 @@ where
         // Remove from `price_table` and `is_running_table`
         unsafe {
             let ptable_ptr =
-                Arc::as_ptr(&self.price_table) as *mut HashMap<Symbol, Arc<Mutex<ExchangeValues>>>;
+                Arc::as_ptr(&self.price_table) as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
             (*ptable_ptr).remove(&symbol);
 
             let runing_table_ptr =
