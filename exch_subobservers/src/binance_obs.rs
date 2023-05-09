@@ -145,15 +145,23 @@ where
         update_value: Arc<Mutex<AskBidValues>>,
         is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let ws_query_sub = kline_stream(&<Symbol as Into<String>>::into(symbol.clone()), "1s");
+        // let ws_query_sub = kline_stream(&<Symbol as Into<String>>::into(symbol.clone()), "1s");
+        let ws_query_sub = book_ticker_stream(&<Symbol as Into<String>>::into(symbol.clone()));
         runner.spawn_blocking(move || {
             let mut websock = WebSockets::new(move |event: WebsocketEvent| -> BResult<()> {
                 match event {
                     WebsocketEvent::OrderBook(order_book) => {
                         trace!("OrderBook: {:?}", order_book);
                     }
-                    WebsocketEvent::BookTicker(book_ticker) => {
-                        trace!("BookTicker: {:?}", book_ticker);
+                    WebsocketEvent::BookTicker(book) => {
+                        let ask_price = f64::from_str(&book.best_ask).unwrap();
+                        let bid_price = f64::from_str(&book.best_bid).unwrap();
+                        let price = (ask_price + bid_price) / 2.0;
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((ask_price, bid_price));
+                        trace!("[{}] Price: {:?}", book.symbol, price);
                     }
                     WebsocketEvent::Kline(kline) => {
                         let kline = kline.kline;
