@@ -3,8 +3,8 @@ use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeObserverKind, AskBidValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, ExchangeValues
+    AskBidValues, ExchangeObserver, ExchangeObserverKind, ExchangeValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol,
 };
 use std::{
     collections::HashMap,
@@ -52,7 +52,8 @@ where
         + Sync
         + 'static,
 {
-    pub observers: HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
+    pub observers:
+        HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
     // TODO: Rewrite `clients` back to dynamic hashmap like `observers`,
     // turns out we can use `downcast_mut` to get the correct inner type
     // for each client, so struct functions will be available
@@ -126,8 +127,7 @@ where
         if let Some(_) = &self.config.binance {
             let binance_client = self.clients.binance_client.clone();
 
-            let binance_observer =
-                BinanceObserver::new(binance_client, runtime.clone());
+            let binance_observer = BinanceObserver::new(binance_client, runtime.clone());
             self.observers
                 .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
         }
@@ -158,10 +158,8 @@ where
                     }
 
                     let symbol = symbol.unwrap();
-                    observer.add_price_to_monitor(
-                        &symbol,
-                        &Arc::new(Mutex::new(AskBidValues::new())),
-                    );
+                    observer
+                        .add_price_to_monitor(&symbol, &Arc::new(Mutex::new(AskBidValues::new())));
                 }
             }
         }
@@ -178,10 +176,8 @@ where
                     }
 
                     let symbol = symbol.unwrap();
-                    observer.add_price_to_monitor(
-                        &symbol,
-                        &Arc::new(Mutex::new(AskBidValues::new())),
-                    );
+                    observer
+                        .add_price_to_monitor(&symbol, &Arc::new(Mutex::new(AskBidValues::new())));
                 }
             }
         }
@@ -192,9 +188,7 @@ where
     /// introduce various race-condition issues as well as intruduce potential bugs in
     /// calculations.
     pub fn clear_uninitialized_symbols(&mut self, kind: ExchangeObserverKind) {
-
         if let Some(observer) = self.observers.get_mut(&kind) {
-
             let mut uninitialized_symbols = Vec::new();
 
             // Fill uninitialized symbols vector

@@ -20,7 +20,8 @@ use tokio::runtime::Runtime;
 
 use exch_clients::BinanceClient;
 use exch_observer_types::{
-    ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder, AskBidValues
+    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
+    SwapOrder,
 };
 
 #[allow(unused)]
@@ -159,7 +160,10 @@ where
                         let price_high = f64::from_str(kline.high.as_ref()).unwrap();
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
                         let price = (price_high + price_low) / 2.0;
-                        update_value.lock().unwrap().update_price((price_high, price_low));
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((price_high, price_low));
                         // update_value.lock().unwrap().update_ask_price(price_high);
                         // update_value.lock().unwrap().update_bid_price(price_low);
                         trace!("[{}] Price: {:?}", kline.symbol, price);
@@ -192,7 +196,6 @@ where
         + Sync
         + 'static,
 {
-
     type Values = AskBidValues;
 
     fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>> {
@@ -272,12 +275,10 @@ where
                 if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
                     || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
                 {
-                    return self
-                        .get_price_from_table(&ordered_sym.symbol)
-                        .map(|v| {
-                            let unlocked = v.lock().unwrap();
-                            (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
-                        });
+                    return self.get_price_from_table(&ordered_sym.symbol).map(|v| {
+                        let unlocked = v.lock().unwrap();
+                        (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
+                    });
                 }
             }
         }

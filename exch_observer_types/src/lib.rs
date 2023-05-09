@@ -1,6 +1,8 @@
 #![feature(associated_type_defaults)]
-use binance::{account::OrderSide, model::Balance as BinanceBalance};
+use binance::{account::OrderSide, errors::Result as BResult, model::Balance as BinanceBalance};
+use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fmt::Debug,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
@@ -143,7 +145,7 @@ pub trait ExchangeValues {
 
 #[derive(Debug, Clone)]
 pub struct ExchangeSingleValues {
-    pub base_price: f64
+    pub base_price: f64,
 }
 
 unsafe impl Send for ExchangeSingleValues {}
@@ -156,7 +158,7 @@ impl ExchangeSingleValues {
 
     pub fn new_with_prices(base_price: f64) -> Self {
         Self {
-            base_price: base_price
+            base_price: base_price,
         }
     }
 }
@@ -188,14 +190,17 @@ impl ExchangeValues for ExchangeSingleValues {
 #[derive(Debug, Clone)]
 pub struct AskBidValues {
     pub ask_price: f64,
-    pub bid_price: f64
+    pub bid_price: f64,
 }
 unsafe impl Send for AskBidValues {}
 unsafe impl Sync for AskBidValues {}
 
 impl AskBidValues {
     pub fn new() -> Self {
-        Self { ask_price: 0.0, bid_price: 0.0 }
+        Self {
+            ask_price: 0.0,
+            bid_price: 0.0,
+        }
     }
 
     pub fn new_with_prices(ask_price: f64, bid_price: f64) -> Self {
@@ -282,7 +287,7 @@ pub enum ExchangeObserverKind {
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExchangeBalance {
     pub asset: String,
     pub free: f64,
@@ -311,6 +316,8 @@ pub trait ExchangeClient<Symbol: Eq + Hash> {
 
     /// Makes sell order on the exchange
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64);
+
+    fn get_balances(&self) -> BResult<HashMap<String, ExchangeBalance>>;
 }
 
 impl Into<ExchangeBalance> for BinanceBalance {

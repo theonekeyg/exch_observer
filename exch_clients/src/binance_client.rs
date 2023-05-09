@@ -1,12 +1,14 @@
 use binance::{
     account::{Account, OrderSide, OrderType, TimeInForce},
     api::Binance,
+    errors::Result as BResult,
     market::Market,
 };
 use exch_observer_types::{ExchangeBalance, ExchangeClient};
 use log::info;
 use std::sync::Arc;
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
@@ -151,5 +153,16 @@ where
             panic!("No runtime set for BinanceClient, cannot execute sell order");
         };
         Self::sell_order1(&runtime, self.account.clone(), symbol.clone(), qty, price);
+    }
+
+    fn get_balances(&self) -> BResult<HashMap<String, ExchangeBalance>> {
+        let account_info = self.account.get_account()?;
+
+        let mut balances: HashMap<String, ExchangeBalance> = HashMap::new();
+        for balance in &account_info.balances {
+            balances.insert(balance.asset.clone(), balance.clone().into());
+        }
+
+        Ok(balances)
     }
 }

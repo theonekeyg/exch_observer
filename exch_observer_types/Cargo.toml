@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
-tokio = { version = "1.27.0", features = ["full"] }
+binance = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
