@@ -183,14 +183,14 @@ where
         self.price_table.get(symbol)
     }
 
-    fn get_usd_value(&self, sym: String) -> Option<f64> {
+    fn get_usd_value(&self, sym: &String) -> Option<f64> {
         // TODO: This lock USD wrapped tokens to 1 seems to be unnecessary,
         // considering to remove this later
-        if let Some(_) = HUOBI_USD_STABLES.into_iter().find(|v| v == &sym) {
+        if let Some(_) = HUOBI_USD_STABLES.into_iter().find(|v| v == sym) {
             return Some(1.0);
         };
 
-        let connected = self.get_interchanged_symbols(&sym);
+        let connected = self.get_interchanged_symbols(sym);
 
         for ordered_sym in connected.iter() {
             for stable in &HUOBI_USD_STABLES {

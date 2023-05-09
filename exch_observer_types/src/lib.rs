@@ -264,7 +264,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn remove_symbol(&mut self, symbol: Symbol);
 
     /// Returns value of certain token to usd if available
-    fn get_usd_value(&self, sym: String) -> Option<f64>;
+    fn get_usd_value(&self, sym: &String) -> Option<f64>;
 
     /// Returns the reference to vector of symbols that are being watched
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
