@@ -264,10 +264,12 @@ where
             });
             // websock.connect(&ws_query_sub)?;
             websock.connect_multiple_streams(&ws_query_subs)?;
-            let is_running = &thread_data.lock().unwrap().is_running;
                 // is_running_table.get(&symbol).unwrap();
-            is_running.store(true, Ordering::Relaxed);
-            websock.event_loop(is_running)?;
+            // is_running.store(, Ordering::Relaxed);
+            // TODO:
+            // Rewrite argument into some bool that can be changed from `remove_symbol` in
+            // observer.
+            websock.event_loop(&AtomicBool::new(true))?;
             BResult::Ok(())
         });
 
