@@ -6,7 +6,7 @@ use std::{
     fmt::Debug,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
 };
 
 pub trait PairedExchangeSymbol {
@@ -327,5 +327,34 @@ impl Into<ExchangeBalance> for BinanceBalance {
             self.free.parse::<f64>().unwrap(),
             self.locked.parse::<f64>().unwrap(),
         )
+    }
+}
+
+pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
+    pub length: usize,
+    pub requests_to_stop: usize,
+    pub requests_to_stop_map: Arc<HashMap<Symbol, bool>>,
+    pub is_running: AtomicBool,
+}
+
+impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
+    pub fn from(symbols: &Vec<Symbol>) -> Self {
+        let length = symbols.len();
+
+        let mut symbols_map = HashMap::new();
+        for symbol in symbols {
+            symbols_map.insert((*symbol).clone(), false);
+        }
+
+        Self {
+            length: length,
+            requests_to_stop: 0,
+            requests_to_stop_map: Arc::new(symbols_map),
+            is_running: AtomicBool::new(false),
+        }
+    }
+
+    pub fn flip_running(&self) {
+        self.is_running.store(!self.is_running.load(Ordering::Relaxed), Ordering::Relaxed);
     }
 }

@@ -21,7 +21,7 @@ use tokio::runtime::Runtime;
 use exch_clients::BinanceClient;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
-    SwapOrder,
+    SwapOrder, ObserverWorkerThreadData
 };
 
 #[allow(unused)]
@@ -104,12 +104,24 @@ where
         + 'static,
 {
     pub watching_symbols: Vec<Symbol>,
+    /// `connected_symbols` - Connected symbols represent all existing pools on certain token,
+    /// hence here `key` is single token (e.g. eth, btc), not pair (e.g. ethusdt).
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
-    price_table: Arc<HashMap<Symbol, Arc<Mutex<AskBidValues>>>>,
+    /// `price_table` - Represents the main storage for prices, as well as accessing the
+    /// prices in the storage. Here key is the pair name (e.g. ethusdt), not the single
+    /// token like in `connected_symbols`. It is made this way to be able to index this
+    /// map from already concatenated pair names, when turning concatenated string into
+    /// ExchangeSymbol is impossible.
+    price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
     is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
     #[allow(dead_code)]
     client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
+
+    threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    symbols_threads_data: Vec<Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    symbols_in_queue: Vec<Symbol>,
+    symbols_queue_limit: usize
 }
 
 impl<Symbol> BinanceObserver<Symbol>
@@ -136,6 +148,11 @@ where
             is_running_table: Arc::new(HashMap::new()),
             client: client,
             async_runner: async_runner,
+
+            threads_data_mapping: HashMap::new(),
+            symbols_threads_data: vec![],
+            symbols_in_queue: vec![],
+            symbols_queue_limit: 8
         }
     }
 
@@ -189,6 +206,76 @@ where
 
         Ok(())
     }
+
+    fn launch_worker_multiple(
+        runner: &Runtime,
+        symbols: &Vec<Symbol>,
+        price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
+        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Started another batch of symbols");
+        let ws_query_subs =
+            symbols
+            .iter()
+            .map(|sym| {
+                let sym = <Symbol as Into<String>>::into(sym.clone());
+                book_ticker_stream(&sym)
+            })
+            .collect::<Vec<_>>();
+        runner.spawn_blocking(move || {
+            let mut websock = WebSockets::new(move |event: WebsocketEvent| -> BResult<()> {
+                match event {
+                    WebsocketEvent::OrderBook(order_book) => {
+                        trace!("OrderBook: {:?}", order_book);
+                    }
+                    WebsocketEvent::BookTicker(book) => {
+                        let ask_price = f64::from_str(&book.best_ask).unwrap();
+                        let bid_price = f64::from_str(&book.best_bid).unwrap();
+                        let price = (ask_price + bid_price) / 2.0;
+
+                        let sym_index = book.symbol.clone().to_ascii_lowercase();
+
+                        let update_value = price_table.get(&sym_index).unwrap();
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((ask_price, bid_price));
+                        trace!("[{}] Price: {:?}", book.symbol, price);
+                    }
+                    WebsocketEvent::Kline(kline) => {
+                        let kline = kline.kline;
+                        let price_high = f64::from_str(kline.high.as_ref()).unwrap();
+                        let price_low = f64::from_str(kline.low.as_ref()).unwrap();
+                        let price = (price_high + price_low) / 2.0;
+
+                        let sym_index = kline.symbol.clone().to_ascii_lowercase();
+
+                        let update_value = price_table.get(&sym_index).unwrap();
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((price_high, price_low));
+                        // update_value
+                        //     .lock()
+                        //     .unwrap()
+                        //     .update_price((price_high, price_low));
+                        trace!("[{}] Price: {:?}", kline.symbol, price);
+                    }
+                    _ => (),
+                }
+                Ok(())
+            });
+            // websock.connect(&ws_query_sub)?;
+            websock.connect_multiple_streams(&ws_query_subs)?;
+            let is_running = &thread_data.lock().unwrap().is_running;
+                // is_running_table.get(&symbol).unwrap();
+            is_running.store(true, Ordering::Relaxed);
+            websock.event_loop(is_running)?;
+            BResult::Ok(())
+        });
+
+        Ok(())
+    }
 }
 
 impl<Symbol> ExchangeObserver<Symbol> for BinanceObserver<Symbol>
@@ -211,7 +298,8 @@ where
     }
 
     fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>) {
-        if !self.price_table.contains_key(&symbol) {
+        let _symbol = <Symbol as Into<String>>::into(symbol.clone());
+        if !self.price_table.contains_key(&_symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
             // thread, we're not required to lock the whole HashMap, since each thread modifies
             // it's own *ExchangeValue.
@@ -252,13 +340,41 @@ where
                 (*is_running_ptr).insert(symbol.clone(), AtomicBool::new(false));
             }
 
-            Self::launch_worker(
-                self.async_runner.deref(),
-                symbol.clone(),
-                update_value,
-                self.is_running_table.clone(),
-            )
-            .unwrap();
+            // Self::launch_worker(
+            //     self.async_runner.deref(),
+            //     symbol.clone(),
+            //     update_value,
+            //     self.is_running_table.clone(),
+            // )
+            // .unwrap();
+
+            self.symbols_in_queue.push(symbol.clone());
+
+            if self.symbols_in_queue.len() > self.symbols_queue_limit {
+
+                let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                    &self.symbols_in_queue
+                )));
+
+                self.symbols_threads_data.push(thread_data.clone());
+
+                for sym in &self.symbols_in_queue {
+                    self.threads_data_mapping.insert(
+                        sym.clone(),
+                        thread_data.clone()
+                    );
+                }
+
+                Self::launch_worker_multiple(
+                    self.async_runner.deref(),
+                    &self.symbols_in_queue,
+                    self.price_table.clone(),
+                    thread_data
+                );
+
+                self.symbols_in_queue.clear();
+            }
+
 
             info!("Added {} to the watching symbols", &symbol);
             self.watching_symbols.push(symbol.clone())
@@ -266,7 +382,8 @@ where
     }
 
     fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
-        self.price_table.get(symbol)
+        let symbol = <Symbol as Into<String>>::into(symbol.clone());
+        self.price_table.get(&symbol)
     }
 
     fn get_usd_value(&self, sym: &String) -> Option<f64> {
@@ -296,23 +413,48 @@ where
 
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting Binance Observer");
-        for symbol in &self.watching_symbols {
-            let update_value;
 
-            unsafe {
-                let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+        if self.symbols_in_queue.len() > 0 {
+            let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                &self.symbols_in_queue
+            )));
 
-                update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
+            self.symbols_threads_data.push(thread_data.clone());
+
+            for sym in &self.symbols_in_queue {
+                self.threads_data_mapping.insert(
+                    sym.clone(),
+                    thread_data.clone()
+                );
             }
 
-            Self::launch_worker(
+            Self::launch_worker_multiple(
                 self.async_runner.deref(),
-                symbol.clone(),
-                update_value,
-                self.is_running_table.clone(),
-            )
-            .unwrap();
+                &self.symbols_in_queue,
+                self.price_table.clone(),
+                thread_data
+            );
+
+            self.symbols_in_queue.clear();
         }
+
+        // for symbol in &self.watching_symbols {
+        //     let update_value;
+
+        //     unsafe {
+        //         let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+
+        //         update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
+        //     }
+
+        //     Self::launch_worker(
+        //         self.async_runner.deref(),
+        //         symbol.clone(),
+        //         update_value,
+        //         self.is_running_table.clone(),
+        //     )
+        //     .unwrap();
+        // }
         Ok(())
     }
 
