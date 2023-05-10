@@ -156,6 +156,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     fn launch_worker(
         runner: &Runtime,
         symbol: Symbol,
@@ -229,11 +230,10 @@ where
                         trace!("OrderBook: {:?}", order_book);
                     }
                     WebsocketEvent::BookTicker(book) => {
+                        let sym_index = book.symbol.clone().to_ascii_lowercase();
                         let ask_price = f64::from_str(&book.best_ask).unwrap();
                         let bid_price = f64::from_str(&book.best_bid).unwrap();
                         let price = (ask_price + bid_price) / 2.0;
-
-                        let sym_index = book.symbol.clone().to_ascii_lowercase();
 
                         let update_value = price_table.get(&sym_index).unwrap();
                         update_value
@@ -244,21 +244,18 @@ where
                     }
                     WebsocketEvent::Kline(kline) => {
                         let kline = kline.kline;
+
+                        let sym_index = kline.symbol.clone().to_ascii_lowercase();
+
                         let price_high = f64::from_str(kline.high.as_ref()).unwrap();
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
                         let price = (price_high + price_low) / 2.0;
-
-                        let sym_index = kline.symbol.clone().to_ascii_lowercase();
 
                         let update_value = price_table.get(&sym_index).unwrap();
                         update_value
                             .lock()
                             .unwrap()
                             .update_price((price_high, price_low));
-                        // update_value
-                        //     .lock()
-                        //     .unwrap()
-                        //     .update_price((price_high, price_low));
                         trace!("[{}] Price: {:?}", kline.symbol, price);
                     }
                     _ => (),
@@ -308,8 +305,8 @@ where
             // other options to expose that logic to the compiler.
             unsafe {
                 let ptable_ptr = Arc::as_ptr(&self.price_table)
-                    as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
-                (*ptable_ptr).insert(symbol.clone(), price.clone());
+                    as *mut HashMap<String, Arc<Mutex<Self::Values>>>;
+                (*ptable_ptr).insert(_symbol.clone(), price.clone());
             }
 
             if !self.connected_symbols.contains_key(symbol.base()) {
@@ -331,8 +328,6 @@ where
                 .unwrap()
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
-            let update_value = price.clone();
-            // self.is_running_table.insert(symbol.clone(), AtomicBool::new(false));
 
             unsafe {
                 let is_running_ptr =
@@ -340,6 +335,8 @@ where
                 (*is_running_ptr).insert(symbol.clone(), AtomicBool::new(false));
             }
 
+            // self.is_running_table.insert(symbol.clone(), AtomicBool::new(false));
+            // let update_value = price.clone();
             // Self::launch_worker(
             //     self.async_runner.deref(),
             //     symbol.clone(),
@@ -350,7 +347,7 @@ where
 
             self.symbols_in_queue.push(symbol.clone());
 
-            if self.symbols_in_queue.len() > self.symbols_queue_limit {
+            if self.symbols_in_queue.len() >= self.symbols_queue_limit {
 
                 let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
                     &self.symbols_in_queue
@@ -370,7 +367,7 @@ where
                     &self.symbols_in_queue,
                     self.price_table.clone(),
                     thread_data
-                );
+                ).unwrap();
 
                 self.symbols_in_queue.clear();
             }
@@ -433,7 +430,7 @@ where
                 &self.symbols_in_queue,
                 self.price_table.clone(),
                 thread_data
-            );
+            )?;
 
             self.symbols_in_queue.clear();
         }
@@ -491,6 +488,23 @@ where
         // Flip running flag
         let is_running = self.is_running_table.get(&symbol).unwrap();
         is_running.store(false, Ordering::Relaxed);
+
+        // Mark the symbol to be removed from the worker thread, so it's price won't be updated
+        // and it shows the thread that one symbol is removed.
+        {
+            let mut data = self.threads_data_mapping.get(&symbol).unwrap().lock().unwrap();
+
+            // Check that the symbol is not already marked to be removed.
+            if !data.requests_to_stop_map.get(&symbol).unwrap() {
+                data.requests_to_stop += 1;
+                data.requests_to_stop_map.insert(symbol.clone(), true).unwrap();
+            }
+
+            // If all symbols are removed from the thread, stop it.
+            if data.requests_to_stop >= data.length {
+                data.is_running.store(false, Ordering::Relaxed);
+            }
+        }
 
         // Remove from `price_table` and `is_running_table`
         unsafe {

@@ -333,7 +333,7 @@ impl Into<ExchangeBalance> for BinanceBalance {
 pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
     pub length: usize,
     pub requests_to_stop: usize,
-    pub requests_to_stop_map: Arc<HashMap<Symbol, bool>>,
+    pub requests_to_stop_map: HashMap<Symbol, bool>,
     pub is_running: AtomicBool,
 }
 
@@ -349,7 +349,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
         Self {
             length: length,
             requests_to_stop: 0,
-            requests_to_stop_map: Arc::new(symbols_map),
+            requests_to_stop_map: symbols_map,
             is_running: AtomicBool::new(false),
         }
     }
