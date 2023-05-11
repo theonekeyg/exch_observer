@@ -1,4 +1,4 @@
-use std::{default::Default, fs::File, io::Read};
+use std::{default::Default, fs::File, io::Read, path::Path};
 
 use serde::Deserialize;
 
@@ -53,7 +53,7 @@ impl ExchObserverConfig {
         }
     }
 
-    pub fn parse_config(config_path: String) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn parse_config<P: AsRef<Path>>(config_path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let mut file = File::open(config_path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
