@@ -117,7 +117,7 @@ where
     /// Necessary for getting control of the threads execution from a function.
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
-    threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    threads_data_mapping: HashMap<Symbol, Arc<ObserverWorkerThreadData<Symbol>>>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -159,7 +159,7 @@ where
         runner: &Runtime,
         symbols: &Vec<Symbol>,
         price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
-        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
+        thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
@@ -177,6 +177,13 @@ where
                     }
                     WebsocketEvent::BookTicker(book) => {
                         let sym_index = book.symbol.clone().to_ascii_lowercase();
+
+                        // Symbol is already removed, don't update price for it,
+                        // since it doens't even exists in the price_table anymore
+                        if *thread_data.requests_to_stop_map.get(&sym_index).unwrap() {
+                            return Ok(());
+                        }
+
                         let ask_price = f64::from_str(&book.best_ask).unwrap();
                         let bid_price = f64::from_str(&book.best_bid).unwrap();
                         let price = (ask_price + bid_price) / 2.0;
@@ -192,6 +199,12 @@ where
                         let kline = kline.kline;
 
                         let sym_index = kline.symbol.clone().to_ascii_lowercase();
+
+                        // Symbol is already removed, don't update price for it,
+                        // since it doens't even exists in the price_table anymore
+                        if *thread_data.requests_to_stop_map.get(&sym_index).unwrap() {
+                            return Ok(());
+                        }
 
                         let price_high = f64::from_str(kline.high.as_ref()).unwrap();
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
@@ -209,7 +222,7 @@ where
                 Ok(())
             });
             websock.connect_multiple_streams(&ws_query_subs)?;
-            websock.event_loop(&thread_data.lock().unwrap().is_running)?;
+            websock.event_loop(&thread_data.is_running)?;
             BResult::Ok(())
         });
 
@@ -246,9 +259,8 @@ where
             // Unfortunately unsafe is required to achieve that in modern Rust, as there are no
             // other options to expose that logic to the compiler.
             unsafe {
-                let ptable_ptr = Arc::as_ptr(&self.price_table)
-                    as *mut HashMap<String, Arc<Mutex<Self::Values>>>;
-                (*ptable_ptr).insert(_symbol.clone(), price.clone());
+                let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+                ptable_ptr.insert(_symbol.clone(), price.clone());
             }
 
             if !self.connected_symbols.contains_key(symbol.base()) {
@@ -273,9 +285,9 @@ where
             self.symbols_in_queue.push(symbol.clone());
 
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
-                let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                let thread_data = Arc::new(ObserverWorkerThreadData::from(
                     &self.symbols_in_queue,
-                )));
+                ));
 
                 for sym in &self.symbols_in_queue {
                     self.threads_data_mapping
@@ -332,9 +344,9 @@ where
         info!("Starting Binance Observer");
 
         if self.symbols_in_queue.len() > 0 {
-            let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+            let thread_data = Arc::new(ObserverWorkerThreadData::from(
                 &self.symbols_in_queue,
-            )));
+            ));
 
             for sym in &self.symbols_in_queue {
                 self.threads_data_mapping
@@ -387,32 +399,36 @@ where
         // Mark the symbol to be removed from the worker thread, so it's price won't be updated
         // and it shows the thread that one symbol is removed.
         {
-            let mut data = self
-                .threads_data_mapping
-                .get(&symbol)
-                .unwrap()
-                .lock()
-                .unwrap();
-
-            // Check that the symbol is not already marked to be removed.
-            if !data.requests_to_stop_map.get(&symbol).unwrap() {
-                data.requests_to_stop += 1;
-                data.requests_to_stop_map
-                    .insert(symbol.clone(), true)
+            // This unsafe statement is safe because the only fields from the
+            // ObserverWorkerThreadData struct other thread uses is AtomicBool. However this way we
+            // won't have to deal with locks in this communication between threads.
+            unsafe {
+                let mut data = self
+                    .threads_data_mapping
+                    .get_mut(&symbol)
                     .unwrap();
-            }
 
-            // If all symbols are removed from the thread, stop it.
-            if data.requests_to_stop >= data.length {
-                data.stop_thread();
+                let mut data = Arc::get_mut_unchecked(&mut data);
+
+                // Check that the symbol is not already marked to be removed.
+                if !data.requests_to_stop_map.get(&symbol).unwrap() {
+                    data.requests_to_stop += 1;
+                    data.requests_to_stop_map
+                        .insert(symbol.clone(), true)
+                        .unwrap();
+                }
+
+                // If all symbols are removed from the thread, stop it.
+                if data.requests_to_stop >= data.length {
+                    data.stop_thread();
+                }
             }
         }
 
         // Remove from `price_table`
         unsafe {
-            let ptable_ptr =
-                Arc::as_ptr(&self.price_table) as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
-            (*ptable_ptr).remove(&symbol);
+            let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+            ptable_ptr.remove(&symbol.clone().into());
         }
 
         debug!("Removed symbol {} from Binace observer", symbol);
