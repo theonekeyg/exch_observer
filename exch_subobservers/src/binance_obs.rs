@@ -114,9 +114,14 @@ where
     client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 
+    /// Necessary for getting control of the threads execution from a function.
+    /// One example of such usage might be killing the thread with multiple symbols
+    /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
-    symbols_threads_data: Vec<Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    /// Symbols in the queue to be added to the new thread, which is created when
+    /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
+    /// The maximum number of symbols that can be in the queue at any given time
     symbols_queue_limit: usize,
 }
 
@@ -145,9 +150,8 @@ where
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
-            symbols_threads_data: vec![],
             symbols_in_queue: vec![],
-            symbols_queue_limit: 8,
+            symbols_queue_limit: 20,
         }
     }
 
@@ -273,8 +277,6 @@ where
                     &self.symbols_in_queue,
                 )));
 
-                self.symbols_threads_data.push(thread_data.clone());
-
                 for sym in &self.symbols_in_queue {
                     self.threads_data_mapping
                         .insert(sym.clone(), thread_data.clone());
@@ -333,8 +335,6 @@ where
             let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
                 &self.symbols_in_queue,
             )));
-
-            self.symbols_threads_data.push(thread_data.clone());
 
             for sym in &self.symbols_in_queue {
                 self.threads_data_mapping

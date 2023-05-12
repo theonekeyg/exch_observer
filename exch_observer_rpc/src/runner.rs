@@ -50,11 +50,6 @@ impl ExchObserver for GrpcObserver {
         &self,
         request: Request<GetPriceRequest>,
     ) -> Result<Response<GetPriceResponse>, Status> {
-        info!(
-            "processing request for symbol {}{}",
-            request.get_ref().base,
-            request.get_ref().quote
-        );
 
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
@@ -75,7 +70,7 @@ impl ExchObserver for GrpcObserver {
             _ => ExchangeObserverKind::Unknown,
         };
 
-        info!(
+        debug!(
             "Received price request for symbol {} on exchange {}",
             symbol, request.exchange
         );
