@@ -392,7 +392,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
         }
     }
 
-    pub fn flip_running(&self) {
-        self.is_running.store(!self.is_running.load(Ordering::Relaxed), Ordering::Relaxed);
+    pub fn stop_thread(&self) {
+        self.is_running.store(false, Ordering::Relaxed);
     }
 }

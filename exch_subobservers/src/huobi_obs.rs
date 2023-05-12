@@ -21,6 +21,11 @@ fn kline_stream(symbol: &str, interval: &str) -> String {
     format!("market.{symbol}.kline.{interval}")
 }
 
+#[allow(unused)]
+fn book_ticker_stream(symbol: &str) -> String {
+    format!("market.{symbol}.ticker")
+}
+
 static HUOBI_USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
 pub struct HuobiObserver<Symbol>
@@ -88,13 +93,19 @@ where
                             .update_price((price_high, price_low));
                         trace!("[{}] Price: {:?}", _symbol, price);
                     }
+                    WebsocketEvent::BookTickerEvent(book) => {
+                        let ask_price = book.best_ask;
+                        let bid_price = book.best_bid;
+                        update_value.lock().unwrap().update_price((ask_price, bid_price));
+                        trace!("[{}] Ask: {:?}, Bid: {:?}", _symbol, ask_price, bid_price);
+                    }
                 }
 
                 Ok(())
             });
 
             websock
-                .connect(&kline_stream(&symbol.clone().into(), "1min"))
+                .connect(&book_ticker_stream(&symbol.clone().into()))
                 .unwrap();
             let is_running = is_running_table.get(&symbol).unwrap();
             is_running.store(true, Ordering::Relaxed);
@@ -210,23 +221,23 @@ where
 
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting Huobi Observer");
-        for symbol in &self.watching_symbols {
-            let update_value;
+        // for symbol in &self.watching_symbols {
+        //     let update_value;
 
-            unsafe {
-                let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+        //     unsafe {
+        //         let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
 
-                update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
-            }
+        //         update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
+        //     }
 
-            Self::launch_worker(
-                self.async_runner.deref(),
-                symbol.clone(),
-                update_value,
-                self.is_running_table.clone(),
-            )
-            .unwrap();
-        }
+        //     Self::launch_worker(
+        //         self.async_runner.deref(),
+        //         symbol.clone(),
+        //         update_value,
+        //         self.is_running_table.clone(),
+        //     )
+        //     .unwrap();
+        // }
         Ok(())
     }
 

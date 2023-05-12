@@ -27,9 +27,16 @@ pub struct KLine {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct BookTick {
+    pub best_bid: f64,
+    pub best_ask: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum WebsocketEvent {
     KLineEvent(KLine),
+    BookTickerEvent(BookTick)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -58,6 +65,36 @@ impl Into<KLine> for HuobiKLine {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct HuobiBookTick {
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub amount: f64,
+    pub vol: f64,
+    pub count: f64,
+    pub bid: f64,
+    #[serde(rename = "bidSize")]
+    pub bid_size: f64,
+    pub ask: f64,
+    #[serde(rename = "askSize")]
+    pub ask_size: f64,
+    #[serde(rename = "lastPrice")]
+    pub last_price: f64,
+    #[serde(rename = "lastSize")]
+    pub last_size: f64,
+}
+
+impl Into<BookTick> for HuobiBookTick {
+    fn into(self) -> BookTick {
+        BookTick {
+            best_bid: self.bid,
+            best_ask: self.ask,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct HuobiKlineEvent {
     #[serde(rename = "ch")]
     pub channel: String,
@@ -65,6 +102,17 @@ struct HuobiKlineEvent {
     pub system_time: u64,
     #[serde(rename = "tick")]
     pub tick: HuobiKLine,
+}
+
+// {"ch":"market.btcusdt.ticker","ts":1683877598657,"tick":{"open":27516.87,"high":27623.31,"low":26120.0,"close":26274.0,"amount":6489.818597098022,"vol":1.750934985679804E8,"count":141080,"bid":26275.21,"bidSize":0.2709,"ask":26275.22,"askSize":0.86,"lastPrice":26274.0,"lastSize":9.47E-4}}
+#[derive(Serialize, Deserialize, Debug)]
+struct HuobiBookTickerEvent {
+    #[serde(rename = "ch")]
+    pub channel: String,
+    #[serde(rename = "ts")]
+    pub system_time: u64,
+    #[serde(rename = "tick")]
+    pub tick: HuobiBookTick,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -82,10 +130,12 @@ struct HuobiStatusEvent {
     pub ts: u64,
 }
 
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum HuobiWebsocketEvent {
     KLineEvent(HuobiKlineEvent),
+    BookTickerEvent(HuobiBookTickerEvent),
     PingEvent(HuobiPingEvent),
     StatusEvent(HuobiStatusEvent),
 }
@@ -180,6 +230,9 @@ impl<'a> HuobiWebsocket<'a> {
                                 // debug!("Received status event: {:?}", event);
                                 continue;
                             }
+                            HuobiWebsocketEvent::BookTickerEvent(event) => {
+                                WebsocketEvent::BookTickerEvent(event.tick.into())
+                            }
                         };
 
                         (self.handler)(ws_event).unwrap();
@@ -243,6 +296,47 @@ fn test_huobi_ping() {
     }
 }
 
+#[test]
+fn test_huobi_book_ticker() {
+    let json = r#"{
+        "ch": "market.btcusdt.ticker",
+        "ts": 1683877598657,
+        "tick": {
+            "open": 27516.87,
+            "high": 27623.31,
+            "low": 26120.0,
+            "close": 26274.0,
+            "amount": 6489.818597098022,
+            "vol": 1.750934985679804E8,
+            "count": 141080,
+            "bid": 26275.21,
+            "bidSize": 0.2709,
+            "ask": 26275.22,
+            "askSize": 0.86,
+            "lastPrice": 26274.0,
+            "lastSize": 9.47E-4
+        }
+    }"#;
+    let event: HuobiWebsocketEvent = serde_json::from_str(json).unwrap();
+
+
+    match event {
+        HuobiWebsocketEvent::BookTickerEvent(book_ticker_event) => {
+            assert_eq!(book_ticker_event.channel, "market.btcusdt.ticker");
+            assert_eq!(book_ticker_event.system_time, 1683877598657);
+            assert_eq!(book_ticker_event.tick.bid, 26275.21);
+            assert_eq!(book_ticker_event.tick.bid_size, 0.2709);
+            assert_eq!(book_ticker_event.tick.ask, 26275.22);
+            assert_eq!(book_ticker_event.tick.ask_size, 0.86);
+            assert_eq!(book_ticker_event.tick.last_price, 26274.0);
+            assert_eq!(book_ticker_event.tick.last_size, 9.47E-4);
+        }
+        _ => {
+            panic!("Unexpected event type");
+        }
+    }
+}
+
 /*
 #[test]
 fn test_huobi_blocking_connection() {
@@ -251,7 +345,7 @@ fn test_huobi_blocking_connection() {
         Ok(())
     });
 
-    ws.connect("market.btcusdt.kline.1min").unwrap();
+    ws.connect("market.ethbtc.kline.1min").unwrap();
     ws.event_loop(&AtomicBool::new(true)).unwrap();
 }
 */
