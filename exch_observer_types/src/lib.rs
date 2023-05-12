@@ -287,6 +287,44 @@ pub enum ExchangeObserverKind {
     Unknown,
 }
 
+impl ExchangeObserverKind {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "binance" => Self::Binance,
+            "bitfinex" => Self::Bitfinex,
+            "bitmex" => Self::Bitmex,
+            "bittrex" => Self::Bittrex,
+            "coinbase" => Self::Coinbase,
+            "deribit" => Self::Deribit,
+            "ftx" => Self::Ftx,
+            "huobi" => Self::Huobi,
+            "kraken" => Self::Kraken,
+            "okex" => Self::Okex,
+            "poloniex" => Self::Poloniex,
+            "uniswap" => Self::Uniswap,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Self::Binance => "binance",
+            Self::Bitfinex => "bitfinex",
+            Self::Bitmex => "bitmex",
+            Self::Bittrex => "bittrex",
+            Self::Coinbase => "coinbase",
+            Self::Deribit => "deribit",
+            Self::Ftx => "ftx",
+            Self::Huobi => "huobi",
+            Self::Kraken => "kraken",
+            Self::Okex => "okex",
+            Self::Poloniex => "poloniex",
+            Self::Uniswap => "uniswap",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExchangeBalance {
     pub asset: String,
