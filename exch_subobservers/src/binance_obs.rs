@@ -262,14 +262,8 @@ where
                 }
                 Ok(())
             });
-            // websock.connect(&ws_query_sub)?;
             websock.connect_multiple_streams(&ws_query_subs)?;
-                // is_running_table.get(&symbol).unwrap();
-            // is_running.store(, Ordering::Relaxed);
-            // TODO:
-            // Rewrite argument into some bool that can be changed from `remove_symbol` in
-            // observer.
-            websock.event_loop(&AtomicBool::new(true))?;
+            websock.event_loop(&thread_data.lock().unwrap().is_running)?;
             BResult::Ok(())
         });
 
@@ -437,23 +431,6 @@ where
             self.symbols_in_queue.clear();
         }
 
-        // for symbol in &self.watching_symbols {
-        //     let update_value;
-
-        //     unsafe {
-        //         let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-
-        //         update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
-        //     }
-
-        //     Self::launch_worker(
-        //         self.async_runner.deref(),
-        //         symbol.clone(),
-        //         update_value,
-        //         self.is_running_table.clone(),
-        //     )
-        //     .unwrap();
-        // }
         Ok(())
     }
 
@@ -504,7 +481,7 @@ where
 
             // If all symbols are removed from the thread, stop it.
             if data.requests_to_stop >= data.length {
-                data.is_running.store(false, Ordering::Relaxed);
+                data.stop_thread();
             }
         }
 
