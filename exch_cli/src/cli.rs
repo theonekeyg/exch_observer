@@ -1,18 +1,23 @@
+use std::env;
 use clap::{Parser, Subcommand};
 use exch_observer::ObserverRunner;
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcClient;
-use log::debug;
+use log::{debug, info};
 use tokio::runtime::Builder as RuntimeBuilder;
+
+lazy_static! {
+    static ref DEFAULT_CONFIG: String = env::var("HOME").unwrap() + "/.exch_observer/default.toml";
+}
 
 #[derive(Debug, Subcommand)]
 pub enum ExchCliCommand {
     Launch {
-        #[arg(short, long, default_value = "/home/keyg/.exch_observer/default.toml")]
+        #[arg(short, long, default_value = DEFAULT_CONFIG.as_str())]
         config: String,
     },
     FetchSymbol {
-        #[arg(short, long, default_value = "/home/keyg/.exch_observer/default.toml")]
+        #[arg(short, long, default_value = DEFAULT_CONFIG.as_str())]
         config: String,
         #[arg(short, long, default_value = "binance")]
         network: String,
@@ -34,6 +39,7 @@ impl ExchCli {
     pub fn start(&self) {
         match &self.command {
             ExchCliCommand::Launch { config } => {
+                debug!("Launching with config: {}", config);
                 self.launch(config.to_string());
             }
             ExchCliCommand::FetchSymbol {
@@ -42,6 +48,10 @@ impl ExchCli {
                 base,
                 quote,
             } => {
+                debug!(
+                    "Fetching symbol with config: {}, network: {}, base: {}, quote: {}",
+                    config, network, base, quote
+                );
                 self.fetch_symbol(
                     config.to_string(),
                     network.to_string(),
