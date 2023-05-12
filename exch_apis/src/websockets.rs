@@ -1,5 +1,6 @@
 use libflate::gzip::Decoder;
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     io::Read,
@@ -15,6 +16,8 @@ use tungstenite::{
 pub struct KLine {
     pub open: f64,
 
+    pub sym: String,
+
     pub close: f64,
 
     pub low: f64,
@@ -28,6 +31,7 @@ pub struct KLine {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BookTick {
+    pub sym: String,
     pub best_bid: f64,
     pub best_ask: f64,
 }
@@ -36,7 +40,7 @@ pub struct BookTick {
 #[serde(untagged)]
 pub enum WebsocketEvent {
     KLineEvent(KLine),
-    BookTickerEvent(BookTick)
+    BookTickerEvent(BookTick),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -49,19 +53,6 @@ struct HuobiKLine {
     pub amount: f64,
     pub vol: f64,
     pub count: f64,
-}
-
-impl Into<KLine> for HuobiKLine {
-    fn into(self) -> KLine {
-        KLine {
-            open: self.open,
-            close: self.close,
-            low: self.low,
-            high: self.high,
-            vol: self.vol,
-            count: self.count,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -85,15 +76,6 @@ struct HuobiBookTick {
     pub last_size: f64,
 }
 
-impl Into<BookTick> for HuobiBookTick {
-    fn into(self) -> BookTick {
-        BookTick {
-            best_bid: self.bid,
-            best_ask: self.ask,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 struct HuobiKlineEvent {
     #[serde(rename = "ch")]
@@ -102,6 +84,27 @@ struct HuobiKlineEvent {
     pub system_time: u64,
     #[serde(rename = "tick")]
     pub tick: HuobiKLine,
+}
+
+lazy_static! {
+    static ref KLINE_SYMBOL_REGEX: Regex =
+        Regex::new(r#"market\.(?P<symbol>\w+)\.kline\.(?P<interval>\w+)"#).unwrap();
+}
+
+impl Into<KLine> for HuobiKlineEvent {
+    fn into(self) -> KLine {
+        let caps = KLINE_SYMBOL_REGEX.captures(&self.channel).unwrap();
+        let symbol = caps.name("symbol").unwrap().as_str();
+        KLine {
+            sym: symbol.to_string(),
+            open: self.tick.open,
+            close: self.tick.close,
+            low: self.tick.low,
+            high: self.tick.high,
+            vol: self.tick.vol,
+            count: self.tick.count,
+        }
+    }
 }
 
 // {"ch":"market.btcusdt.ticker","ts":1683877598657,"tick":{"open":27516.87,"high":27623.31,"low":26120.0,"close":26274.0,"amount":6489.818597098022,"vol":1.750934985679804E8,"count":141080,"bid":26275.21,"bidSize":0.2709,"ask":26275.22,"askSize":0.86,"lastPrice":26274.0,"lastSize":9.47E-4}}
@@ -113,6 +116,23 @@ struct HuobiBookTickerEvent {
     pub system_time: u64,
     #[serde(rename = "tick")]
     pub tick: HuobiBookTick,
+}
+
+lazy_static! {
+    static ref BOOK_TICKER_SYMBOL_REGEX: Regex =
+        Regex::new(r#"market\.(?P<symbol>\w+)\.ticker"#).unwrap();
+}
+
+impl Into<BookTick> for HuobiBookTickerEvent {
+    fn into(self) -> BookTick {
+        let caps = BOOK_TICKER_SYMBOL_REGEX.captures(&self.channel).unwrap();
+        let symbol = caps.name("symbol").unwrap().as_str();
+        BookTick {
+            sym: symbol.to_string(),
+            best_bid: self.tick.bid,
+            best_ask: self.tick.ask,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -129,7 +149,6 @@ struct HuobiStatusEvent {
     pub subbed: String,
     pub ts: u64,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -182,6 +201,21 @@ impl<'a> HuobiWebsocket<'a> {
         self.connect_ws(subscription)
     }
 
+    pub fn connect_multiple_streams<S: Into<String>>(
+        &mut self,
+        subscriptions: Vec<S>,
+    ) -> WsResult<()> {
+        if self.socket.is_none() {
+            self.socket = Some(self.create_connection(HUOBI_WS_URL)?);
+        }
+
+        for subscription in subscriptions {
+            self.connect_ws(subscription.into().as_ref())?;
+        }
+
+        Ok(())
+    }
+
     /// Sends a subscription message to the Huobi websocket stream, which is the
     /// documented way of subscribing to a stream.
     fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
@@ -216,7 +250,7 @@ impl<'a> HuobiWebsocket<'a> {
 
                         let ws_event = match event {
                             HuobiWebsocketEvent::KLineEvent(event) => {
-                                WebsocketEvent::KLineEvent(event.tick.into())
+                                WebsocketEvent::KLineEvent(event.into())
                             }
                             HuobiWebsocketEvent::PingEvent(event) => {
                                 // debug!("Received ping event: {}", event.ping);
@@ -231,7 +265,7 @@ impl<'a> HuobiWebsocket<'a> {
                                 continue;
                             }
                             HuobiWebsocketEvent::BookTickerEvent(event) => {
-                                WebsocketEvent::BookTickerEvent(event.tick.into())
+                                WebsocketEvent::BookTickerEvent(event.into())
                             }
                         };
 
@@ -268,7 +302,7 @@ fn test_huobi_kline() {
     let event: HuobiWebsocketEvent = serde_json::from_str(json).unwrap();
     match event {
         HuobiWebsocketEvent::KLineEvent(kline_event) => {
-            let kline: KLine = kline_event.tick.into();
+            let kline: KLine = kline_event.into();
             assert_eq!(kline.open, 10000.0);
             assert_eq!(kline.close, 11006.0);
             assert_eq!(kline.low, 10000.0);
@@ -318,7 +352,6 @@ fn test_huobi_book_ticker() {
         }
     }"#;
     let event: HuobiWebsocketEvent = serde_json::from_str(json).unwrap();
-
 
     match event {
         HuobiWebsocketEvent::BookTickerEvent(book_ticker_event) => {

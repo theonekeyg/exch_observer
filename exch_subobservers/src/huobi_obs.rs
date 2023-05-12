@@ -1,7 +1,7 @@
 use exch_apis::websockets::{HuobiWebsocket, WebsocketEvent};
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
-    SwapOrder,
+    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
 use log::{debug, info, trace};
 use std::{
@@ -9,10 +9,7 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -43,10 +40,14 @@ where
 {
     pub watching_symbols: Vec<Symbol>,
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
-    price_table: Arc<HashMap<Symbol, Arc<Mutex<AskBidValues>>>>,
-    is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
+    price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
     // client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
+
+    threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    symbols_threads_data: Vec<Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    symbols_in_queue: Vec<Symbol>,
+    symbols_queue_limit: usize,
 }
 
 impl<Symbol> HuobiObserver<Symbol>
@@ -67,49 +68,66 @@ where
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
-            is_running_table: Arc::new(HashMap::new()),
             // client: client,
             async_runner: async_runner,
+
+            threads_data_mapping: HashMap::new(),
+            symbols_threads_data: vec![],
+            symbols_in_queue: vec![],
+            symbols_queue_limit: 8,
         }
     }
 
-    fn launch_worker(
+    fn launch_worker_multiple(
         runner: &Runtime,
-        symbol: Symbol,
-        update_value: Arc<Mutex<AskBidValues>>,
-        is_running_table: Arc<HashMap<Symbol, AtomicBool>>,
+        symbols: &Vec<Symbol>,
+        price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
+        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Started another batch of symbols");
+        let ws_query_subs = symbols
+            .iter()
+            .map(|sym| {
+                let sym = <Symbol as Into<String>>::into(sym.clone());
+                book_ticker_stream(&sym)
+            })
+            .collect::<Vec<_>>();
         runner.spawn_blocking(move || {
-            let _symbol = symbol.clone();
-            let mut websock = HuobiWebsocket::new(move |event: WebsocketEvent| {
-                match event {
-                    WebsocketEvent::KLineEvent(kline) => {
-                        let price_high = kline.high;
-                        let price_low = kline.low;
-                        let price = (price_high + price_low) / 2.0;
-                        update_value
-                            .lock()
-                            .unwrap()
-                            .update_price((price_high, price_low));
-                        trace!("[{}] Price: {:?}", _symbol, price);
+            let mut websock = HuobiWebsocket::new(
+                move |event: WebsocketEvent| -> Result<(), Box<dyn std::error::Error>> {
+                    match event {
+                        WebsocketEvent::KLineEvent(kline) => {
+                            let price_high = kline.high;
+                            let price_low = kline.low;
+                            let price = (price_high + price_low) / 2.0;
+                            let sym_index = kline.sym.clone().to_ascii_lowercase();
+                            let update_value = price_table.get(&sym_index).unwrap();
+                            update_value
+                                .lock()
+                                .unwrap()
+                                .update_price((price_high, price_low));
+                            trace!("[{}] Price: {:?}", sym_index, price);
+                        }
+                        WebsocketEvent::BookTickerEvent(book) => {
+                            let ask_price = book.best_ask;
+                            let bid_price = book.best_bid;
+                            let sym_index = book.sym.clone().to_ascii_lowercase();
+                            let update_value = price_table.get(&sym_index).unwrap();
+                            update_value
+                                .lock()
+                                .unwrap()
+                                .update_price((ask_price, bid_price));
+                            trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+                        }
                     }
-                    WebsocketEvent::BookTickerEvent(book) => {
-                        let ask_price = book.best_ask;
-                        let bid_price = book.best_bid;
-                        update_value.lock().unwrap().update_price((ask_price, bid_price));
-                        trace!("[{}] Ask: {:?}, Bid: {:?}", _symbol, ask_price, bid_price);
-                    }
-                }
 
-                Ok(())
-            });
-
+                    Ok(())
+                },
+            );
+            websock.connect_multiple_streams(ws_query_subs).unwrap();
             websock
-                .connect(&book_ticker_stream(&symbol.clone().into()))
+                .event_loop(&thread_data.lock().unwrap().is_running)
                 .unwrap();
-            let is_running = is_running_table.get(&symbol).unwrap();
-            is_running.store(true, Ordering::Relaxed);
-            websock.event_loop(is_running).unwrap();
         });
 
         Ok(())
@@ -136,7 +154,8 @@ where
     }
 
     fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>) {
-        if !self.price_table.contains_key(&symbol) {
+        let _symbol = <Symbol as Into<String>>::into(symbol.clone());
+        if !self.price_table.contains_key(&_symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
             // thread, we're not required to lock the whole HashMap, since each thread modifies
             // it's own *ExchangeValue.
@@ -145,8 +164,8 @@ where
             // other options to expose that logic to the compiler.
             unsafe {
                 let ptable_ptr = Arc::as_ptr(&self.price_table)
-                    as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
-                (*ptable_ptr).insert(symbol.clone(), price.clone());
+                    as *mut HashMap<String, Arc<Mutex<Self::Values>>>;
+                (*ptable_ptr).insert(_symbol.clone(), price.clone());
             }
 
             if !self.connected_symbols.contains_key(symbol.base()) {
@@ -168,22 +187,30 @@ where
                 .unwrap()
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
-            let update_value = price.clone();
-            // self.is_running_table.insert(symbol.clone(), AtomicBool::new(false));
+            self.symbols_in_queue.push(symbol.clone());
 
-            unsafe {
-                let is_running_ptr =
-                    Arc::as_ptr(&self.is_running_table) as *mut HashMap<Symbol, AtomicBool>;
-                (*is_running_ptr).insert(symbol.clone(), AtomicBool::new(false));
+            if self.symbols_in_queue.len() >= self.symbols_queue_limit {
+                let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                    &self.symbols_in_queue,
+                )));
+
+                self.symbols_threads_data.push(thread_data.clone());
+
+                for sym in &self.symbols_in_queue {
+                    self.threads_data_mapping
+                        .insert(sym.clone(), thread_data.clone());
+                }
+
+                Self::launch_worker_multiple(
+                    self.async_runner.deref(),
+                    &self.symbols_in_queue,
+                    self.price_table.clone(),
+                    thread_data,
+                )
+                .unwrap();
+
+                self.symbols_in_queue.clear();
             }
-
-            Self::launch_worker(
-                self.async_runner.deref(),
-                symbol.clone(),
-                update_value,
-                self.is_running_table.clone(),
-            )
-            .unwrap();
 
             info!("Added {} to the watching symbols", &symbol);
             self.watching_symbols.push(symbol.clone())
@@ -191,7 +218,8 @@ where
     }
 
     fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
-        self.price_table.get(symbol)
+        let symbol = <Symbol as Into<String>>::into(symbol.clone());
+        self.price_table.get(&symbol)
     }
 
     fn get_usd_value(&self, sym: &String) -> Option<f64> {
@@ -221,30 +249,36 @@ where
 
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting Huobi Observer");
-        // for symbol in &self.watching_symbols {
-        //     let update_value;
 
-        //     unsafe {
-        //         let table_entry_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+        if self.symbols_in_queue.len() > 0 {
+            let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                &self.symbols_in_queue,
+            )));
 
-        //         update_value = (*table_entry_ptr).get_mut(&symbol).unwrap().clone();
-        //     }
+            self.symbols_threads_data.push(thread_data.clone());
 
-        //     Self::launch_worker(
-        //         self.async_runner.deref(),
-        //         symbol.clone(),
-        //         update_value,
-        //         self.is_running_table.clone(),
-        //     )
-        //     .unwrap();
-        // }
+            for sym in &self.symbols_in_queue {
+                self.threads_data_mapping
+                    .insert(sym.clone(), thread_data.clone());
+            }
+
+            Self::launch_worker_multiple(
+                self.async_runner.deref(),
+                &self.symbols_in_queue,
+                self.price_table.clone(),
+                thread_data,
+            )?;
+
+            self.symbols_in_queue.clear();
+        }
+
         Ok(())
     }
 
     fn remove_symbol(&mut self, symbol: Symbol) {
         // Remove symbol from `watching_symbols`, `connected_symbols` from both base and quote
-        // symbols and `price_table`, also stop it's worker by flipping it's bool in
-        // `is_running_table`.
+        // symbols and `price_table`, also vote for this symbol's thread to stop (won't stop
+        // untill all symbols related to this thread vote to stop it).
 
         // Remove from the `watching_symbols`
         for (i, sym) in self.watching_symbols.iter().enumerate() {
@@ -271,19 +305,35 @@ where
             }
         }
 
-        // Flip running flag
-        let is_running = self.is_running_table.get(&symbol).unwrap();
-        is_running.store(false, Ordering::Relaxed);
+        // Mark the symbol to be removed from the worker thread, so it's price won't be updated
+        // and it shows the thread that one symbol is removed.
+        {
+            let mut data = self
+                .threads_data_mapping
+                .get(&symbol)
+                .unwrap()
+                .lock()
+                .unwrap();
 
-        // Remove from `price_table` and `is_running_table`
+            // Check that the symbol is not already marked to be removed.
+            if !data.requests_to_stop_map.get(&symbol).unwrap() {
+                data.requests_to_stop += 1;
+                data.requests_to_stop_map
+                    .insert(symbol.clone(), true)
+                    .unwrap();
+            }
+
+            // If all symbols are removed from the thread, stop it.
+            if data.requests_to_stop >= data.length {
+                data.stop_thread();
+            }
+        }
+
+        // Remove from `price_table`
         unsafe {
             let ptable_ptr =
                 Arc::as_ptr(&self.price_table) as *mut HashMap<Symbol, Arc<Mutex<Self::Values>>>;
             (*ptable_ptr).remove(&symbol);
-
-            let runing_table_ptr =
-                Arc::as_ptr(&self.is_running_table) as *mut HashMap<Symbol, AtomicBool>;
-            (*runing_table_ptr).remove(&symbol);
         }
 
         debug!("Removed symbol {} from Huobi observer", symbol);

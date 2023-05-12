@@ -29,6 +29,7 @@ exch_observer_rpc = { path = "exch_observer_rpc" }
 exch_observer_types = { path = "exch_observer_types" }
 exch_subobservers = { path = "exch_subobservers" }
 exch_apis = { path = "exch_apis" }
+regex = "1.8.1"
 libflate = "1.3.0"
 log = "0.4.17"
 prost = "0.11.8"

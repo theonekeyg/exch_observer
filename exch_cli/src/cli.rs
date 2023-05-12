@@ -1,9 +1,9 @@
-use std::env;
 use clap::{Parser, Subcommand};
 use exch_observer::ObserverRunner;
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcClient;
-use log::{debug, info};
+use log::debug;
+use std::env;
 use tokio::runtime::Builder as RuntimeBuilder;
 
 lazy_static! {

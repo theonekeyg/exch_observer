@@ -6,7 +6,10 @@ use std::{
     fmt::Debug,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
-    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
 
 pub trait PairedExchangeSymbol {
@@ -388,8 +391,12 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             length: length,
             requests_to_stop: 0,
             requests_to_stop_map: symbols_map,
-            is_running: AtomicBool::new(false),
+            is_running: AtomicBool::new(true),
         }
+    }
+
+    pub fn start_thread(&self) {
+        self.is_running.store(true, Ordering::Relaxed);
     }
 
     pub fn stop_thread(&self) {
