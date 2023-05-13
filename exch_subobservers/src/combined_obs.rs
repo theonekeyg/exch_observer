@@ -88,6 +88,7 @@ where
         rv
     }
 
+    /// Creates new CombinedObserver object with provided tokio runtime.
     pub fn new_with_runtime(config: ObserverConfig, async_runtime: Arc<Runtime>) -> Self {
         Self {
             observers: HashMap::new(),
@@ -98,6 +99,7 @@ where
         }
     }
 
+    /// Sets the tokio runtime for the observer.
     pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
         self.runtime = Some(runtime);
     }
@@ -115,6 +117,7 @@ where
 
     /// Creates observers for each exchange in the config, must be called before `load_symbols`.
     pub fn create_observers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Make sure we have a valid tokio runtime
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
@@ -124,6 +127,7 @@ where
             )));
         };
 
+        // Create observers based on the provided config
         if let Some(_) = &self.config.binance {
             let binance_client = self.clients.binance_client.clone();
 
@@ -144,6 +148,10 @@ where
     /// Loads symbols in the observer from the config, must be called after `create_observers` and
     /// before `launch`.
     pub fn load_symbols(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
+
+        // Load symbols from csv file, pass them to provided closure,
+        // and add them to each observer we had in the config.
+
         if let Some(binance_config) = &self.config.binance {
             if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
                 // let mut observer = observer.downcast_mut::<BinanceObserver<Symbol>>().unwrap();
@@ -206,11 +214,14 @@ where
         }
     }
 
+    /// Main function to launch the built observer, must be called after `create_observers` and
+    /// `load_symbols`.
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.is_running {
             return Ok(());
         }
 
+        // Start each observer.
         if let Some(binance_observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
             binance_observer.start()?;
         }
@@ -223,6 +234,11 @@ where
         Ok(())
     }
 
+    /// Returns the reference to the price stored in the observer.
+    ///
+    /// # Arguments
+    /// * `kind` - The kind of the observer to get the prices from.
+    /// * `symbol` - The symbol to get the prices for.
     pub fn get_price(
         &self,
         kind: ExchangeObserverKind,
@@ -235,12 +251,14 @@ where
         None
     }
 
+    /// Removes the symbol from the observer.
     pub fn remove_symbol(&mut self, kind: ExchangeObserverKind, symbol: Symbol) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.remove_symbol(symbol);
         }
     }
 
+    /// Adds the symbol to the observer.
     pub fn add_price_to_monitor(
         &mut self,
         kind: ExchangeObserverKind,
