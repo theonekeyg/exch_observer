@@ -17,9 +17,10 @@ use tokio::runtime::Runtime;
 
 use exch_clients::BinanceClient;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
+    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol, SwapOrder,
 };
+use crate::internal::{ObserverWorkerThreadData};
 
 #[allow(unused)]
 fn all_ticker_stream() -> &'static str {

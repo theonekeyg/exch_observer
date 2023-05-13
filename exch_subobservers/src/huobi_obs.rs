@@ -1,7 +1,7 @@
 use exch_apis::websockets::{HuobiWebsocket, WebsocketEvent};
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
+    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol, SwapOrder,
 };
 use log::{debug, info, trace};
 use std::{
@@ -12,6 +12,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::runtime::Runtime;
+use crate::internal::{ObserverWorkerThreadData};
 
 #[allow(unused)]
 fn kline_stream(symbol: &str, interval: &str) -> String {
