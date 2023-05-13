@@ -7,6 +7,8 @@ use exch_observer_rpc::ObserverRpcRunner;
 use exch_observer_types::ExchangeSymbol;
 use exch_subobservers::CombinedObserver;
 
+/// Main runner for the observer binary, contains the main observer and the
+/// configured services in the config
 pub struct ObserverRunner {
     pub main_observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
     pub config: ExchObserverConfig,
@@ -17,6 +19,7 @@ impl ObserverRunner {
     pub fn new(config: ExchObserverConfig) -> Self {
         let observer = Arc::new(RwLock::new(CombinedObserver::new(config.observer.clone())));
 
+        // Create and set runtime for the observer
         let async_runtime = Arc::new(
             RuntimeBuilder::new_multi_thread()
                 .worker_threads(config.num_threads.unwrap_or(4))
@@ -34,12 +37,15 @@ impl ObserverRunner {
         }
     }
 
+    /// Returns an Arc to the tokio's runtime ObserverRunner is using
     pub fn get_async_runner(&self) -> &'_ Arc<Runtime> {
         return &self.runtime;
     }
 
+    /// Launches the observer and other services (i.e. RPC) that might interact with the observer
     pub fn launch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         {
+            // Create the observers, load their symbols and launch them
             let mut observer = self.main_observer.write().unwrap();
             observer.create_observers().unwrap();
             observer.load_symbols(|record| {
@@ -49,10 +55,8 @@ impl ObserverRunner {
             });
             observer.launch().unwrap();
         }
-        // let observer_handle = observer_binding.launch();
 
-        // let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, self.config.rpc.clone().unwrap());
-        // let rpc_handle = Some(self.runtime.spawn(async move { rpc_observer.run(); }));
+        // Start RPC service if configured
         let rpc_handle = if let Some(ref rpc_config) = self.config.rpc {
             let mut rpc_observer = ObserverRpcRunner::new(&self.main_observer, rpc_config.clone());
             Some(self.runtime.spawn(async move {
@@ -62,9 +66,8 @@ impl ObserverRunner {
             None
         };
 
+        // Block main thread until all services are done
         self.runtime.block_on(async {
-            // info!("Awaiting observer handle");
-            // observer_handle.await.unwrap();
             if let Some(rpc_handle) = rpc_handle {
                 info!("Awaiting rpc handle");
                 rpc_handle.await.unwrap();

@@ -2,20 +2,25 @@ use std::{default::Default, fs::File, io::Read, path::Path};
 
 use serde::Deserialize;
 
+/// Struct representing the configuration for the Binance observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct BinanceConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
 }
 
+/// Struct representing the configuration for the Huobi observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct HuobiConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
 }
 
+/// Struct for configuring the RPC server/client
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcConfig {
     pub port: Option<u16>,
@@ -31,14 +36,18 @@ impl Default for RpcConfig {
     }
 }
 
+/// Struct representing the configuration for the observer,
+/// currently contains only the configuration for inner-observers.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ObserverConfig {
     pub binance: Option<BinanceConfig>,
     pub huobi: Option<HuobiConfig>,
 }
 
+/// Struct representing the configuration for the `exch_observer` binary
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExchObserverConfig {
+    /// Maximum number of threads the observer can use
     pub num_threads: Option<usize>,
     pub observer: ObserverConfig,
     pub rpc: Option<RpcConfig>,
@@ -53,6 +62,7 @@ impl ExchObserverConfig {
         }
     }
 
+    /// Parses .toml configuration file from provided path
     pub fn parse_config<P: AsRef<Path>>(
         config_path: P,
     ) -> Result<Self, Box<dyn std::error::Error>> {

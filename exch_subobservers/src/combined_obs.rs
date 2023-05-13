@@ -38,6 +38,9 @@ where
     }
 }
 
+/// Main struct for the observer, contains all the observers, using this
+/// as main observer for bots & other services is recommended and not
+/// using regular observers by themselves.
 pub struct CombinedObserver<Symbol>
 where
     Symbol: Eq
@@ -270,6 +273,9 @@ where
         }
     }
 
+    /// Get interchanged symbols for the specified token.
+    /// Interchanged means symbols that this token can be exchanged in
+    /// (e.g. `eth` token can be exchanged in `ethusdt` `ethbtc` pairs).
     pub fn get_interchanged_symbols(
         &self,
         kind: ExchangeObserverKind,
@@ -282,6 +288,11 @@ where
         None
     }
 
+    /// Gets the USD value for the specified token.
+    /// Beware that this function gets usd value by searching
+    /// pairs that this token can be exchanged in (looking for USD stables),
+    /// if the token doesn't exist in any known USD stable pairs (in the same observer),
+    /// None is returned.
     pub fn get_usd_value(&self, kind: ExchangeObserverKind, symbol: &String) -> Option<f64> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_usd_value(symbol);
@@ -290,6 +301,7 @@ where
         None
     }
 
+    /// Returns the reference to the `watching_symbols` in the observer.
     pub fn get_watching_symbols(&self, kind: ExchangeObserverKind) -> Option<&'_ Vec<Symbol>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_watching_symbols());

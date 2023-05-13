@@ -1,3 +1,7 @@
+/**
+ * The `websockets.rs` file contains the code for the required WebSocket API clients.
+ * Currently only Huobi WebSocket API is implemented.
+ **/
 use libflate::gzip::Decoder;
 
 use regex::Regex;
@@ -12,6 +16,7 @@ use tungstenite::{
     stream::MaybeTlsStream, Message,
 };
 
+/// Our internal struct to represent KLine data tick
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KLine {
     pub open: f64,
@@ -29,6 +34,7 @@ pub struct KLine {
     pub count: f64,
 }
 
+/// Our internal struct to represent Book data tick
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BookTick {
     pub sym: String,
@@ -43,6 +49,7 @@ pub enum WebsocketEvent {
     BookTickerEvent(BookTick),
 }
 
+/// Internal Huobi KLine ABI
 #[derive(Serialize, Deserialize, Debug)]
 struct HuobiKLine {
     pub id: u64,
@@ -55,6 +62,7 @@ struct HuobiKLine {
     pub count: f64,
 }
 
+/// Internal Huobi BookTick ABI
 #[derive(Serialize, Deserialize, Debug)]
 struct HuobiBookTick {
     pub open: f64,
@@ -87,6 +95,7 @@ struct HuobiKlineEvent {
 }
 
 lazy_static! {
+    /// Regex to extract symbol and interval from Huobi KLine channel
     static ref KLINE_SYMBOL_REGEX: Regex =
         Regex::new(r#"market\.(?P<symbol>\w+)\.kline\.(?P<interval>\w+)"#).unwrap();
 }
@@ -107,7 +116,6 @@ impl Into<KLine> for HuobiKlineEvent {
     }
 }
 
-// {"ch":"market.btcusdt.ticker","ts":1683877598657,"tick":{"open":27516.87,"high":27623.31,"low":26120.0,"close":26274.0,"amount":6489.818597098022,"vol":1.750934985679804E8,"count":141080,"bid":26275.21,"bidSize":0.2709,"ask":26275.22,"askSize":0.86,"lastPrice":26274.0,"lastSize":9.47E-4}}
 #[derive(Serialize, Deserialize, Debug)]
 struct HuobiBookTickerEvent {
     #[serde(rename = "ch")]
@@ -119,6 +127,7 @@ struct HuobiBookTickerEvent {
 }
 
 lazy_static! {
+    /// Regex to extract symbol from Huobi BookTick channel
     static ref BOOK_TICKER_SYMBOL_REGEX: Regex =
         Regex::new(r#"market\.(?P<symbol>\w+)\.ticker"#).unwrap();
 }
@@ -159,6 +168,9 @@ enum HuobiWebsocketEvent {
     StatusEvent(HuobiStatusEvent),
 }
 
+/// Structure to provide multiple websocket connections at once,
+/// not relevant for Huobi because Huobi WebSocket API uses single channel
+/// for multiple symbols
 #[allow(dead_code)]
 enum HuobiConnectionKind {
     Default,
@@ -166,15 +178,19 @@ enum HuobiConnectionKind {
     Custom(String),
 }
 
+/// Huobi base URL for websocket API
 const HUOBI_WS_URL: &str = "wss://api.huobi.pro/ws";
+/// Used to generate unique IDs for Huobi subscriptions
 static HUOBI_UNIQUE_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Huobi WebSocket client
 pub struct HuobiWebsocket<'a> {
     pub socket: Option<(WebSocket<MaybeTlsStream<TcpStream>>, Response)>,
     handler: Box<dyn FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a>,
 }
 
 impl<'a> HuobiWebsocket<'a> {
+    /// Creates new HuobiWebsocket with provided function to handle events
     pub fn new<Callback>(handler: Callback) -> Self
     where
         Callback: FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a,
@@ -185,6 +201,7 @@ impl<'a> HuobiWebsocket<'a> {
         }
     }
 
+    /// Connects to Huobi WebSocket API with single subscription
     pub fn connect(&mut self, subscription: &str) -> WsResult<()> {
         if self.socket.is_none() {
             self.socket = Some(self.create_connection(HUOBI_WS_URL)?);
@@ -201,6 +218,7 @@ impl<'a> HuobiWebsocket<'a> {
         self.connect_ws(subscription)
     }
 
+    /// Connects to Huobi WebSocket API with multiple subscriptions
     pub fn connect_multiple_streams<S: Into<String>>(
         &mut self,
         subscriptions: Vec<S>,
@@ -237,12 +255,16 @@ impl<'a> HuobiWebsocket<'a> {
         connect(url)
     }
 
+    /// Main event loop for Huobi WebSocket API
     pub fn event_loop(&mut self, running: &AtomicBool) -> WsResult<()> {
+        // Only start the server if running flag is true
         while running.load(Ordering::Relaxed) {
             if let Some(ref mut socket) = self.socket {
                 let msg = socket.0.read_message()?;
                 match msg {
                     Message::Binary(bin) => {
+                        // Huobi WebSocket API only sends messages in binary encrypted gzip format,
+                        // so we need to decompress the data before we can process it
                         let mut decoder = Decoder::new(&bin[..])?;
                         let mut text = String::new();
                         decoder.read_to_string(&mut text).unwrap();

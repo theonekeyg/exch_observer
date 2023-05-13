@@ -4,6 +4,9 @@ use std::{
     hash::Hash
 };
 
+/// Internal data structure for the observer worker threads.
+/// Used to implement voting mechanism for symbols to stop their threads,
+/// this mechanism allowes threads to monitor multiple symbols at once
 pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
     pub length: usize,
     pub requests_to_stop: usize,

@@ -15,9 +15,11 @@ use std::{
     marker::Sync,
     net::SocketAddr,
     sync::{Arc, RwLock},
+    str::FromStr
 };
 use tonic::{transport::Server, Request, Response, Status};
 
+/// Struct representing the observer RPC service
 pub struct GrpcObserver {
     observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
 }
@@ -54,21 +56,7 @@ impl ExchObserver for GrpcObserver {
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
         let symbol = ExchangeSymbol::from(&request.base, &request.quote);
-        let exchange = match request.exchange.as_str() {
-            "binance" => ExchangeObserverKind::Binance,
-            "bitfinex" => ExchangeObserverKind::Bitfinex,
-            "bitmex" => ExchangeObserverKind::Bitmex,
-            "bittrex" => ExchangeObserverKind::Bittrex,
-            "coinbase" => ExchangeObserverKind::Coinbase,
-            "derbit" => ExchangeObserverKind::Deribit,
-            "ftx" => ExchangeObserverKind::Ftx,
-            "huobi" => ExchangeObserverKind::Huobi,
-            "kraken" => ExchangeObserverKind::Kraken,
-            "okex" => ExchangeObserverKind::Okex,
-            "poloniex" => ExchangeObserverKind::Poloniex,
-            "uniswap" => ExchangeObserverKind::Uniswap,
-            _ => ExchangeObserverKind::Unknown,
-        };
+        let exchange = ExchangeObserverKind::from_str(&request.exchange).unwrap();
 
         debug!(
             "Received price request for symbol {} on exchange {}",
@@ -89,6 +77,7 @@ impl ExchObserver for GrpcObserver {
     }
 }
 
+/// Struct representing server for RPC service in `exch_observer`
 pub struct ObserverRpcRunner {
     rpc: Arc<GrpcObserver>,
     config: RpcConfig,
@@ -128,6 +117,7 @@ impl ObserverRpcRunner {
     }
 }
 
+/// Client for the observer RPC service
 pub struct ObserverRpcClient {
     inner: ExchObserverClient<tonic::transport::Channel>,
 }
@@ -144,6 +134,12 @@ impl ObserverRpcClient {
         Self { inner: client }
     }
 
+    /// Fetch the price of a symbol on an observer
+    ///
+    /// # Arguments
+    /// * `exchange` - The exchange to query
+    /// * `base` - The base symbol
+    /// * `quote` - The quote symbol
     pub async fn get_price(&mut self, exchange: &str, base: &str, quote: &str) -> f64 {
         debug!(
             "Fetching price for symbol {}{} on exchange {}",

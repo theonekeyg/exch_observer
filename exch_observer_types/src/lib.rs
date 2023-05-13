@@ -7,13 +7,20 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
+    str::FromStr
 };
 
+/// Base trait for a symbol of the exchange pair.
 pub trait PairedExchangeSymbol {
+    /// Returns the base token in the symbol (e.g. `eth` in `ethbtc`)
     fn base(&self) -> &str;
+    /// Returns the quote token in the symbol (e.g. `btc` in `ethbtc`)
     fn quote(&self) -> &str;
 }
 
+/// Very basic symbol structure, used in the observer RPC server.
+/// For more complicated applications (such as trading bots or information-gathering tools)
+/// using more complex structure might be more convenient.
 #[derive(Debug, Clone)]
 pub struct ExchangeSymbol {
     pub base: String,
@@ -79,6 +86,7 @@ impl Display for ExchangeSymbol {
 
 impl Eq for ExchangeSymbol {}
 
+/// SwapOrder represents buy/sell orders.
 #[derive(Debug, Eq, Hash, PartialEq, Copy, Clone)]
 pub enum SwapOrder {
     Sell,
@@ -100,6 +108,7 @@ impl Into<OrderSide> for SwapOrder {
     }
 }
 
+/// OrderedExchangeSymbol is a symbol with a specific order (buy/sell).
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct OrderedExchangeSymbol<Symbol: Eq + Hash> {
     pub symbol: Symbol,
@@ -114,6 +123,8 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
         }
     }
 
+    /// Returns the output token of the possible swap
+    /// (e.g. `eth` in `ethbtc` if the order is `Buy`)
     pub fn get_output_symbol(&self) -> String {
         let rv = match self.order {
             SwapOrder::Buy => self.symbol.base().into(),
@@ -123,6 +134,8 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
         rv
     }
 
+    /// Returns the input token of the possible swap
+    /// (e.g. `btc` in `ethbtc` if the order is `Buy`)
     pub fn get_input_symbol(&self) -> String {
         let rv = match self.order {
             SwapOrder::Buy => self.symbol.quote().into(),
@@ -133,6 +146,7 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
     }
 }
 
+/// Trait to represent a type of a current price on the exchange
 pub trait ExchangeValues {
     type Values = (f64, f64);
 
@@ -143,6 +157,7 @@ pub trait ExchangeValues {
     fn showable_price(&self) -> f64;
 }
 
+/// Very basic structure to store a price as a single value
 #[derive(Debug, Clone)]
 pub struct ExchangeSingleValues {
     pub base_price: f64,
@@ -152,10 +167,12 @@ unsafe impl Send for ExchangeSingleValues {}
 unsafe impl Sync for ExchangeSingleValues {}
 
 impl ExchangeSingleValues {
+    /// Create new ExchangeSingleValues with price set to 0.
     pub fn new() -> Self {
         Self { base_price: 0.0 }
     }
 
+    /// Create new ExchangeSingleValues with price set to `base_price`.
     pub fn new_with_prices(base_price: f64) -> Self {
         Self {
             base_price: base_price,
@@ -187,6 +204,9 @@ impl ExchangeValues for ExchangeSingleValues {
     }
 }
 
+/// Structure to store a price as a pair of values (ask/bid).
+/// Value it stores is best ask/bid price currently in the exchange pair.
+/// This structure is used by default in all observers.
 #[derive(Debug, Clone)]
 pub struct AskBidValues {
     pub ask_price: f64,
@@ -196,6 +216,7 @@ unsafe impl Send for AskBidValues {}
 unsafe impl Sync for AskBidValues {}
 
 impl AskBidValues {
+    /// Creates new AskBidValues with prices set to 0.
     pub fn new() -> Self {
         Self {
             ask_price: 0.0,
@@ -203,6 +224,7 @@ impl AskBidValues {
         }
     }
 
+    /// Creates new AskBidValues with prices set to `ask_price` and `bid_price`.
     pub fn new_with_prices(ask_price: f64, bid_price: f64) -> Self {
         Self {
             ask_price: ask_price,
@@ -236,6 +258,7 @@ impl ExchangeValues for AskBidValues {
     }
 }
 
+/// Trait to represent an observer of an exchange. All observers must implement this trait.
 pub trait ExchangeObserver<Symbol: Eq + Hash> {
     // Appropriate fields for your observer:
     //
@@ -270,6 +293,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
 }
 
+/// Enum to represent an exchange type
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ExchangeObserverKind {
     Binance,
@@ -288,24 +312,7 @@ pub enum ExchangeObserverKind {
 }
 
 impl ExchangeObserverKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "binance" => Self::Binance,
-            "bitfinex" => Self::Bitfinex,
-            "bitmex" => Self::Bitmex,
-            "bittrex" => Self::Bittrex,
-            "coinbase" => Self::Coinbase,
-            "deribit" => Self::Deribit,
-            "ftx" => Self::Ftx,
-            "huobi" => Self::Huobi,
-            "kraken" => Self::Kraken,
-            "okex" => Self::Okex,
-            "poloniex" => Self::Poloniex,
-            "uniswap" => Self::Uniswap,
-            _ => Self::Unknown,
-        }
-    }
-
+    /// Serializes ExchangeObserverKind to string
     pub fn to_str(&self) -> &'static str {
         match self {
             Self::Binance => "binance",
@@ -325,6 +332,30 @@ impl ExchangeObserverKind {
     }
 }
 
+impl FromStr for ExchangeObserverKind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "binance" => Self::Binance,
+            "bitfinex" => Self::Bitfinex,
+            "bitmex" => Self::Bitmex,
+            "bittrex" => Self::Bittrex,
+            "coinbase" => Self::Coinbase,
+            "deribit" => Self::Deribit,
+            "ftx" => Self::Ftx,
+            "huobi" => Self::Huobi,
+            "kraken" => Self::Kraken,
+            "okex" => Self::Okex,
+            "poloniex" => Self::Poloniex,
+            "uniswap" => Self::Uniswap,
+            _ => Self::Unknown,
+        })
+    }
+}
+
+/// Structure to represent balance on the exchange.
+/// Not used in observer, but often used in exchange clients.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExchangeBalance {
     pub asset: String,
@@ -342,6 +373,7 @@ impl ExchangeBalance {
     }
 }
 
+/// Trait to represent an exchange client. All exchange clients must implement this trait.
 pub trait ExchangeClient<Symbol: Eq + Hash> {
     /// Checks if symbol exists on the exchange
     fn symbol_exists(&self, symbol: &Symbol) -> bool;

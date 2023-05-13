@@ -15,8 +15,12 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
+/// Client for the Binance REST API, implemented using
+/// `https://github.com/wisespace-io/binance-rs.git` crate
 pub struct BinanceClient<Symbol: Eq + Hash> {
+    /// Account API
     pub account: Arc<Account>,
+    /// Market API
     pub market: Arc<Market>,
     pub runtime: Option<Arc<Runtime>>,
     marker: PhantomData<Symbol>,
@@ -53,6 +57,7 @@ impl<Symbol: Eq + Hash + Clone + Display + Debug + Into<String>> BinanceClient<S
         self.runtime.is_some()
     }
 
+    /// Sends Buy GTC limit order to Binance REST API
     fn buy_order1(runner: &Runtime, account: Arc<Account>, symbol: Symbol, qty: f64, price: f64) {
         let mut symbol: String = symbol.into();
         symbol.make_ascii_uppercase();
@@ -83,6 +88,7 @@ impl<Symbol: Eq + Hash + Clone + Display + Debug + Into<String>> BinanceClient<S
         });
     }
 
+    /// Sends Sell GTC limit order to Binance REST API
     fn sell_order1(runner: &Runtime, account: Arc<Account>, symbol: Symbol, qty: f64, price: f64) {
         let mut symbol: String = symbol.into();
         symbol.make_ascii_uppercase();
@@ -124,6 +130,7 @@ where
             .is_ok()
     }
 
+    /// Fetches the balance for the given asset from Binance Account API
     fn get_balance(&self, asset: &String) -> Option<ExchangeBalance> {
         let mut asset: String = asset.into();
         asset.make_ascii_uppercase();
@@ -137,6 +144,7 @@ where
         rv
     }
 
+    /// Sends Buy GTC limit order to Binance REST API
     fn buy_order(&self, symbol: &Symbol, qty: f64, price: f64) {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
@@ -146,6 +154,7 @@ where
         Self::buy_order1(&runtime, self.account.clone(), symbol.clone(), qty, price);
     }
 
+    /// Sends Sell GTC limit order to Binance REST API
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64) {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
@@ -155,6 +164,7 @@ where
         Self::sell_order1(&runtime, self.account.clone(), symbol.clone(), qty, price);
     }
 
+    /// Fetches the balances for all assets from Binance Account API
     fn get_balances(&self) -> BResult<HashMap<String, ExchangeBalance>> {
         let account_info = self.account.get_account()?;
 

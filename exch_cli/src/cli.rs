@@ -62,6 +62,7 @@ impl ExchCli {
         }
     }
 
+    /// Fetches symbol from the observer RPC api
     pub fn fetch_symbol(&self, config: String, network: String, base: String, quote: String) {
         let config = ExchObserverConfig::parse_config(config).unwrap();
         let rpc_config = config.rpc.clone().unwrap_or_default();
@@ -77,6 +78,7 @@ impl ExchCli {
         println!("price: {}", price);
     }
 
+    /// Launches the observer
     pub fn launch(&self, config: String) {
         let config = ExchObserverConfig::parse_config(config).unwrap();
         println!("{:?}", config);
