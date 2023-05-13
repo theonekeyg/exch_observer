@@ -178,12 +178,6 @@ where
                     WebsocketEvent::BookTicker(book) => {
                         let sym_index = book.symbol.clone().to_ascii_lowercase();
 
-                        // Symbol is already removed, don't update price for it,
-                        // since it doens't even exists in the price_table anymore
-                        if *thread_data.requests_to_stop_map.get(&sym_index).unwrap() {
-                            return Ok(());
-                        }
-
                         let ask_price = f64::from_str(&book.best_ask).unwrap();
                         let bid_price = f64::from_str(&book.best_bid).unwrap();
                         let price = (ask_price + bid_price) / 2.0;
@@ -199,12 +193,6 @@ where
                         let kline = kline.kline;
 
                         let sym_index = kline.symbol.clone().to_ascii_lowercase();
-
-                        // Symbol is already removed, don't update price for it,
-                        // since it doens't even exists in the price_table anymore
-                        if *thread_data.requests_to_stop_map.get(&sym_index).unwrap() {
-                            return Ok(());
-                        }
 
                         let price_high = f64::from_str(kline.high.as_ref()).unwrap();
                         let price_low = f64::from_str(kline.low.as_ref()).unwrap();
@@ -401,7 +389,8 @@ where
         {
             // This unsafe statement is safe because the only fields from the
             // ObserverWorkerThreadData struct other thread uses is AtomicBool. However this way we
-            // won't have to deal with locks in this communication between threads.
+            // won't have to deal with locks in this communication between threads. As long as
+            // only AtomicBool in this structure is used in subthreads, this is thread-safe.
             unsafe {
                 let mut data = self
                     .threads_data_mapping
@@ -420,17 +409,24 @@ where
 
                 // If all symbols are removed from the thread, stop it.
                 if data.requests_to_stop >= data.length {
+                    // Stop the running thread.
                     data.stop_thread();
+
+                    // Only remove prices when all symbols are removed from the thread.
+                    for symbol in data.requests_to_stop_map.keys() {
+                        // Remove symbol from `threads_data_mapping`
+
+                        // Remove symbol from `price_table` This code is unsafe, since it gets
+                        // mutable data directly from Arc. Although, this unsafe block should be
+                        // safe, since we stopped the thread before.
+                        let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
+                        ptable_ptr.remove(&symbol.clone().into());
+                    }
                 }
             }
         }
 
-        // Remove from `price_table`
-        unsafe {
-            let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-            ptable_ptr.remove(&symbol.clone().into());
-        }
-
+        self.threads_data_mapping.remove(&symbol);
         debug!("Removed symbol {} from Binace observer", symbol);
     }
 
