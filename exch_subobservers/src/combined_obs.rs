@@ -159,7 +159,7 @@ where
 
                     let symbol = symbol.unwrap();
                     observer
-                        .add_price_to_monitor(&symbol, &Arc::new(Mutex::new(AskBidValues::new())));
+                        .add_price_to_monitor(&symbol, Arc::new(Mutex::new(AskBidValues::new())));
                 }
             }
         }
@@ -177,7 +177,7 @@ where
 
                     let symbol = symbol.unwrap();
                     observer
-                        .add_price_to_monitor(&symbol, &Arc::new(Mutex::new(AskBidValues::new())));
+                        .add_price_to_monitor(&symbol, Arc::new(Mutex::new(AskBidValues::new())));
                 }
             }
         }
@@ -245,7 +245,7 @@ where
         &mut self,
         kind: ExchangeObserverKind,
         symbol: &Symbol,
-        price: &Arc<Mutex<AskBidValues>>,
+        price: Arc<Mutex<AskBidValues>>,
     ) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.add_price_to_monitor(symbol, price);

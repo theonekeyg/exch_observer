@@ -237,7 +237,7 @@ where
         &self.connected_symbols.get::<String>(symbol).unwrap()
     }
 
-    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>) {
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Self::Values>>) {
         let _symbol = <Symbol as Into<String>>::into(symbol.clone());
         if !self.price_table.contains_key(&_symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
@@ -248,7 +248,7 @@ where
             // other options to expose that logic to the compiler.
             unsafe {
                 let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-                ptable_ptr.insert(_symbol.clone(), price.clone());
+                ptable_ptr.insert(_symbol.clone(), price);
             }
 
             if !self.connected_symbols.contains_key(symbol.base()) {

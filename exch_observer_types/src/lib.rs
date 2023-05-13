@@ -254,7 +254,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn get_interchanged_symbols(&self, symbol: &String) -> &'_ Vec<OrderedExchangeSymbol<Symbol>>;
 
     /// Adds price to the monitor
-    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: &Arc<Mutex<Self::Values>>);
+    fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Self::Values>>);
 
     /// Fetches price on certain symbol from the observer
     fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>>;
