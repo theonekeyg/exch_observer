@@ -17,6 +17,8 @@ pub struct GetPriceResponse {
     pub quote: ::prost::alloc::string::String,
     #[prost(double, tag = "3")]
     pub price: f64,
+    #[prost(uint64, tag = "4")]
+    pub timestamp: u64,
 }
 /// Generated client implementations.
 pub mod exch_observer_client {

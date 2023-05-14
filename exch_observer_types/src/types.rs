@@ -149,19 +149,33 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
 
 /// Trait to represent a type of a current price on the exchange
 pub trait ExchangeValues {
+    /// Values that the price is represented with
     type Values = (f64, f64);
 
+    /// Updates the price with the new values
     fn update_price(&mut self, price: Self::Values);
+
+    /// Returns the current best ask price
     fn get_ask_price(&self) -> f64;
+
+    /// Returns the current best bid price
     fn get_bid_price(&self) -> f64;
+
+    /// Returns true if value is initialized at least once
     fn is_initialized(&self) -> bool;
+
+    /// Returns showable price in single float value format.
     fn showable_price(&self) -> f64;
+
+    /// Returns the timestamp of the last update
+    fn update_timestamp(&self) -> u64;
 }
 
 /// Very basic structure to store a price as a single value
 #[derive(Debug, Clone)]
 pub struct ExchangeSingleValues {
     pub base_price: f64,
+    pub update_timestamp: u64
 }
 
 unsafe impl Send for ExchangeSingleValues {}
@@ -170,13 +184,17 @@ unsafe impl Sync for ExchangeSingleValues {}
 impl ExchangeSingleValues {
     /// Create new ExchangeSingleValues with price set to 0.
     pub fn new() -> Self {
-        Self { base_price: 0.0 }
+        Self {
+            base_price: 0.0,
+            update_timestamp: get_current_timestamp().unwrap()
+        }
     }
 
     /// Create new ExchangeSingleValues with price set to `base_price`.
     pub fn new_with_prices(base_price: f64) -> Self {
         Self {
             base_price: base_price,
+            update_timestamp: get_current_timestamp().unwrap()
         }
     }
 }
@@ -186,6 +204,7 @@ impl ExchangeValues for ExchangeSingleValues {
 
     fn update_price(&mut self, price: Self::Values) {
         self.base_price = price;
+        self.update_timestamp = get_current_timestamp().unwrap();
     }
 
     fn get_ask_price(&self) -> f64 {
@@ -202,6 +221,10 @@ impl ExchangeValues for ExchangeSingleValues {
 
     fn showable_price(&self) -> f64 {
         self.base_price
+    }
+
+    fn update_timestamp(&self) -> u64 {
+        self.update_timestamp
     }
 }
 
@@ -260,6 +283,10 @@ impl ExchangeValues for AskBidValues {
 
     fn showable_price(&self) -> f64 {
         (self.ask_price + self.bid_price) / 2.0
+    }
+
+    fn update_timestamp(&self) -> u64 {
+        self.update_timestamp
     }
 }
 

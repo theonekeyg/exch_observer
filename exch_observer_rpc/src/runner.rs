@@ -62,17 +62,21 @@ impl ExchObserver for GrpcObserver {
             "Received price request for symbol {} on exchange {}",
             symbol, request.exchange
         );
-        let price = observer
+
+        let _price = observer
             .get_price(exchange, &symbol)
             .unwrap()
             .lock()
-            .unwrap()
-            .showable_price();
+            .unwrap();
+
+        let price = _price.showable_price();
+        let timestamp = _price.update_timestamp();
 
         Ok(Response::new(GetPriceResponse {
             base: request.base,
             quote: request.quote,
             price: price,
+            timestamp: timestamp
         }))
     }
 }
@@ -156,5 +160,30 @@ impl ObserverRpcClient {
             .unwrap();
 
         res.into_inner().price
+    }
+
+    /// Fetch the price and last update timestmap of a symbol on an observer
+    ///
+    /// # Arguments
+    /// * `exchange` - The exchange to query
+    /// * `base` - The base symbol
+    /// * `quote` - The quote symbol
+    pub async fn get_price_with_timestamp(&mut self, exchange: &str, base: &str, quote: &str) -> (f64, u64) {
+        debug!(
+            "Fetching price for symbol {}{} on exchange {}",
+            base, quote, exchange
+        );
+        let res = self
+            .inner
+            .get_price(GetPriceRequest {
+                exchange: exchange.to_string(),
+                base: base.to_string(),
+                quote: quote.to_string(),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        (res.price, res.timestamp)
     }
 }

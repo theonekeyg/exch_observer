@@ -74,8 +74,8 @@ impl ExchCli {
         let mut client = runtime.block_on(ObserverRpcClient::new(rpc_config));
 
         debug!("Fetching price");
-        let price = runtime.block_on(client.get_price(&network, &base, &quote));
-        println!("price: {}", price);
+        let (price, timestamp) = runtime.block_on(client.get_price_with_timestamp(&network, &base, &quote));
+        println!("price: {} was {} seconds ago", price, timestamp);
     }
 
     /// Launches the observer
