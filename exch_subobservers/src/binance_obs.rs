@@ -210,8 +210,8 @@ where
                 }
                 Ok(())
             });
-            websock.connect_multiple_streams(&ws_query_subs)?;
-            websock.event_loop(&thread_data.is_running)?;
+            websock.connect_multiple_streams(&ws_query_subs).unwrap();
+            websock.event_loop(&thread_data.is_running).unwrap();
             BResult::Ok(())
         });
 
