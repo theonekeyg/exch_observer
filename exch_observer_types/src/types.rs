@@ -9,7 +9,7 @@ use std::{
     str::FromStr
 };
 
-use crate::utils::get_current_timestamp;
+use exch_observer_utils::get_current_timestamp;
 
 /// Base trait for a symbol of the exchange pair.
 pub trait PairedExchangeSymbol {

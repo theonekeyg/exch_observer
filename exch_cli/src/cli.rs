@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use exch_observer::ObserverRunner;
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcClient;
+use exch_observer_utils::get_current_timestamp;
 use log::debug;
 use std::env;
 use tokio::runtime::Builder as RuntimeBuilder;
@@ -75,7 +76,10 @@ impl ExchCli {
 
         debug!("Fetching price");
         let (price, timestamp) = runtime.block_on(client.get_price_with_timestamp(&network, &base, &quote));
-        println!("price: {} was {} seconds ago", price, timestamp);
+        println!(
+            "price: {} was {} seconds ago", price,
+            get_current_timestamp().unwrap() - timestamp
+        );
     }
 
     /// Launches the observer

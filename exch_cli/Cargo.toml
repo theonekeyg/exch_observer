@@ -15,6 +15,7 @@ env_logger = { workspace = true }
 dotenvy = { workspace = true }
 exch_observer_rpc = { workspace = true }
 exch_observer_config = { workspace = true }
+exch_observer_utils = { workspace = true }
 exch_observer = { workspace = true }
 exch_clients = { workspace = true }
 binance = { workspace = true }

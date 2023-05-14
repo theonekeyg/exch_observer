@@ -9,3 +9,4 @@ edition = "2021"
 binance = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+exch_observer_utils = { workspace = true }
