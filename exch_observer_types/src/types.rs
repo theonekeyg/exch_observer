@@ -164,6 +164,9 @@ pub trait ExchangeValues {
     /// Returns true if value is initialized at least once
     fn is_initialized(&self) -> bool;
 
+    /// Uninitializes the value
+    fn uninitialize(&mut self);
+
     /// Returns showable price in single float value format.
     fn showable_price(&self) -> f64;
 
@@ -186,7 +189,7 @@ impl ExchangeSingleValues {
     pub fn new() -> Self {
         Self {
             base_price: 0.0,
-            update_timestamp: get_current_timestamp().unwrap()
+            update_timestamp: 0
         }
     }
 
@@ -216,7 +219,12 @@ impl ExchangeValues for ExchangeSingleValues {
     }
 
     fn is_initialized(&self) -> bool {
-        self.base_price != 0.0
+        self.update_timestamp != 0
+    }
+
+    fn uninitialize(&mut self) {
+        self.base_price = 0.0;
+        self.update_timestamp = 0;
     }
 
     fn showable_price(&self) -> f64 {
@@ -279,6 +287,12 @@ impl ExchangeValues for AskBidValues {
 
     fn is_initialized(&self) -> bool {
         self.update_timestamp != 0
+    }
+
+    fn uninitialize(&mut self) {
+        self.ask_price = 0.0;
+        self.bid_price = 0.0;
+        self.update_timestamp = 0;
     }
 
     fn showable_price(&self) -> f64 {
