@@ -39,6 +39,6 @@ Or run use CLI from `exch_observer's` debug repo.
 
 ## Contribution
 
-`exch_observer` is still in active development, so ABIs and APIs and might still
+`exch_observer` is still in active development, so ABIs and APIs is still a concept of
 change. But contributing implementations of observers as well as proposals for
 handling DEXs are greatly appreciated.
