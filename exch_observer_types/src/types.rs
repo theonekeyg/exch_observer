@@ -11,6 +11,8 @@ use std::{
 
 use exch_observer_utils::get_current_timestamp;
 
+pub static USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
+
 /// Base trait for a symbol of the exchange pair.
 pub trait PairedExchangeSymbol {
     /// Returns the base token in the symbol (e.g. `eth` in `ethbtc`)

@@ -40,4 +40,3 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
         self.is_running.store(false, Ordering::Relaxed);
     }
 }
-
