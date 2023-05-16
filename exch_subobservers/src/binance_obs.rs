@@ -13,7 +13,7 @@ use std::{
     sync::{Arc, Mutex, RwLock},
     vec::Vec,
 };
-use tokio::runtime::Runtime;
+use tokio::{task::JoinHandle, runtime::Runtime};
 
 use exch_clients::BinanceClient;
 use exch_observer_types::{
@@ -119,6 +119,7 @@ where
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<ObserverWorkerThreadData<Symbol>>>,
+    running_handles: Vec<(JoinHandle<BResult<()>>, Arc<ObserverWorkerThreadData<Symbol>>)>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -151,6 +152,7 @@ where
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
+            running_handles: vec![],
             symbols_in_queue: vec![],
             symbols_queue_limit: 20,
         }
@@ -161,7 +163,7 @@ where
         symbols: &Vec<Symbol>,
         price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
         thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> JoinHandle<BResult<()>> {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
             .iter()
@@ -213,8 +215,6 @@ where
             websock.connect_multiple_streams(&ws_query_subs).unwrap();
             websock.event_loop(&thread_data.is_running).unwrap();
             BResult::Ok(())
-        });
-
-        Ok(())
+        })
     }
 }

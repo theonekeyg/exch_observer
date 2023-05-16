@@ -83,18 +83,18 @@ fn impl_observer_macro(ast: &syn::DeriveInput) -> TokenStream {
                             &self.symbols_in_queue,
                         ));
 
+                        let handle = Self::launch_worker_multiple(
+                            self.async_runner.deref(),
+                            &self.symbols_in_queue,
+                            self.price_table.clone(),
+                            thread_data.clone(),
+                        );
+                        self.running_handles.push((handle, thread_data.clone()));
+
                         for sym in &self.symbols_in_queue {
                             self.threads_data_mapping
                                 .insert(sym.clone(), thread_data.clone());
                         }
-
-                        Self::launch_worker_multiple(
-                            self.async_runner.deref(),
-                            &self.symbols_in_queue,
-                            self.price_table.clone(),
-                            thread_data,
-                        )
-                        .unwrap();
 
                         self.symbols_in_queue.clear();
                     }
@@ -147,12 +147,13 @@ fn impl_observer_macro(ast: &syn::DeriveInput) -> TokenStream {
                             .insert(sym.clone(), thread_data.clone());
                     }
 
-                    Self::launch_worker_multiple(
+                    let handle = Self::launch_worker_multiple(
                         self.async_runner.deref(),
                         &self.symbols_in_queue,
                         self.price_table.clone(),
-                        thread_data,
-                    )?;
+                        thread_data.clone(),
+                    );
+                    self.running_handles.push((handle, thread_data.clone()));
 
                     self.symbols_in_queue.clear();
                 }

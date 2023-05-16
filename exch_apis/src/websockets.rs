@@ -12,9 +12,27 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use tungstenite::{
-    connect, error::Result as WsResult, handshake::client::Response, protocol::WebSocket,
+    connect, handshake::client::Response, protocol::WebSocket,
     stream::MaybeTlsStream, Message,
 };
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum HuobiWsError {
+    #[error("WebSocket connection was closed by the server")]
+    Disconnected,
+
+    #[error("Error when creating socket connection to the server: {0}")]
+    SocketError(String),
+
+    #[error("Error when writing to created socket connection: {0}")]
+    WriteError(String),
+
+    #[error("Error when reading from the socket connection: {0}")]
+    ReadError(String),
+}
+
+pub type HuobiWsResult<T> = Result<T, HuobiWsError>;
 
 /// Our internal struct to represent KLine data tick
 #[derive(Serialize, Deserialize, Debug)]
@@ -186,14 +204,14 @@ static HUOBI_UNIQUE_ID: AtomicU64 = AtomicU64::new(1);
 /// Huobi WebSocket client
 pub struct HuobiWebsocket<'a> {
     pub socket: Option<(WebSocket<MaybeTlsStream<TcpStream>>, Response)>,
-    handler: Box<dyn FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a>,
+    handler: Box<dyn FnMut(WebsocketEvent) -> HuobiWsResult<()> + 'a>,
 }
 
 impl<'a> HuobiWebsocket<'a> {
     /// Creates new HuobiWebsocket with provided function to handle events
     pub fn new<Callback>(handler: Callback) -> Self
     where
-        Callback: FnMut(WebsocketEvent) -> Result<(), Box<dyn std::error::Error>> + 'a,
+        Callback: FnMut(WebsocketEvent) -> HuobiWsResult<()> + 'a,
     {
         Self {
             socket: None,
@@ -202,7 +220,7 @@ impl<'a> HuobiWebsocket<'a> {
     }
 
     /// Connects to Huobi WebSocket API with single subscription
-    pub fn connect(&mut self, subscription: &str) -> WsResult<()> {
+    pub fn connect(&mut self, subscription: &str) -> HuobiWsResult<()> {
         if self.socket.is_none() {
             self.socket = Some(self.create_connection(HUOBI_WS_URL)?);
         }
@@ -210,7 +228,7 @@ impl<'a> HuobiWebsocket<'a> {
         self.connect_ws(subscription)
     }
 
-    pub fn connect_custom(&mut self, url: String, subscription: &str) -> WsResult<()> {
+    pub fn connect_custom(&mut self, url: String, subscription: &str) -> HuobiWsResult<()> {
         if self.socket.is_none() {
             self.socket = Some(self.create_connection(url.as_ref())?);
         }
@@ -222,7 +240,7 @@ impl<'a> HuobiWebsocket<'a> {
     pub fn connect_multiple_streams<S: Into<String>>(
         &mut self,
         subscriptions: Vec<S>,
-    ) -> WsResult<()> {
+    ) -> HuobiWsResult<()> {
         if self.socket.is_none() {
             self.socket = Some(self.create_connection(HUOBI_WS_URL)?);
         }
@@ -236,13 +254,13 @@ impl<'a> HuobiWebsocket<'a> {
 
     /// Sends a subscription message to the Huobi websocket stream, which is the
     /// documented way of subscribing to a stream.
-    fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
+    fn connect_ws(&mut self, subscription: &str) -> HuobiWsResult<()> {
         if let Some(ref mut socket) = self.socket {
             socket.0.write_message(Message::Text(format!(
                 "{{\"sub\": \"{}\", \"id\": \"id{}\"}}",
                 subscription,
                 HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed)
-            )))?;
+            ))).map_err(|e| HuobiWsError::WriteError(e.to_string()))?;
         }
 
         Ok(())
@@ -251,21 +269,23 @@ impl<'a> HuobiWebsocket<'a> {
     fn create_connection(
         &self,
         url: &str,
-    ) -> WsResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
-        connect(url)
+    ) -> HuobiWsResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
+        connect(url).map_err(|e| HuobiWsError::SocketError(e.to_string()))
     }
 
     /// Main event loop for Huobi WebSocket API
-    pub fn event_loop(&mut self, running: &AtomicBool) -> WsResult<()> {
-        // Only start the server if running flag is true
+    pub fn event_loop(&mut self, running: &AtomicBool) -> HuobiWsResult<()> {
+        // Only start the connection if running flag is true
         while running.load(Ordering::Relaxed) {
             if let Some(ref mut socket) = self.socket {
-                let msg = socket.0.read_message()?;
+                let msg = socket.0.read_message().map_err(|e| {
+                    HuobiWsError::ReadError(e.to_string())
+                })?;
                 match msg {
                     Message::Binary(bin) => {
                         // Huobi WebSocket API only sends messages in binary encrypted gzip format,
                         // so we need to decompress the data before we can process it
-                        let mut decoder = Decoder::new(&bin[..])?;
+                        let mut decoder = Decoder::new(&bin[..]).unwrap();
                         let mut text = String::new();
                         decoder.read_to_string(&mut text).unwrap();
                         let event: HuobiWebsocketEvent = serde_json::from_str(&text).unwrap();
@@ -279,7 +299,7 @@ impl<'a> HuobiWebsocket<'a> {
                                 socket.0.write_message(Message::Text(format!(
                                     "{{\"pong\":{}}}",
                                     event.ping
-                                )))?;
+                                ))).map_err(|e| HuobiWsError::WriteError(e.to_string()))?;
                                 continue;
                             }
                             HuobiWebsocketEvent::StatusEvent(_event) => {

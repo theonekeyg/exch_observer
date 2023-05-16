@@ -3,6 +3,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     hash::Hash
 };
+use tokio::task::JoinHandle;
 
 /// Internal data structure for the observer worker threads.
 /// Used to implement voting mechanism for symbols to stop their threads,
@@ -12,6 +13,7 @@ pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
     pub requests_to_stop: usize,
     pub requests_to_stop_map: HashMap<Symbol, bool>,
     pub is_running: AtomicBool,
+    pub handle: Option<JoinHandle<()>>,
 }
 
 impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
@@ -28,6 +30,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             requests_to_stop: 0,
             requests_to_stop_map: symbols_map,
             is_running: AtomicBool::new(true),
+            handle: None,
         }
     }
 
@@ -38,5 +41,13 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
 
     pub fn stop_thread(&self) {
         self.is_running.store(false, Ordering::Relaxed);
+    }
+
+    #[allow(dead_code)]
+    pub fn get_running_symbols_iter(&self) -> impl Iterator<Item = &Symbol> {
+        self.requests_to_stop_map
+            .iter()
+            .filter(|(_, &is_running)| is_running)
+            .map(|(symbol, _)| symbol)
     }
 }

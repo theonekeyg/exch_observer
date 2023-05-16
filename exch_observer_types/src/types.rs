@@ -330,6 +330,10 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     /// Initialize the runtime, if observer requires one
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Starts the threads that will ping existing threads, if some handle appears to be dead, it
+    /// will be removed from the observer
+    // fn spawn_await_on_handles(
+
     /// Allegedly remove symbol from watching table, if your observer has one, if not,
     /// this might be an nop
     fn remove_symbol(&mut self, symbol: Symbol);
