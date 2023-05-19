@@ -1,4 +1,7 @@
-use exch_apis::websockets::{HuobiWebsocket, WebsocketEvent, HuobiWsResult};
+use exch_apis::{
+    huobi_ws::HuobiWebsocket,
+    common::{Result as HuobiWsResult, WebsocketEvent},
+};
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
     PairedExchangeSymbol, SwapOrder, USD_STABLES
