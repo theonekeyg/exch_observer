@@ -15,6 +15,7 @@ use tungstenite::{
     connect, handshake::client::Response, protocol::WebSocket,
     stream::MaybeTlsStream, Message,
 };
+use log::{error, warn};
 
 use crate::common::{
     KLine, BookTick, WebsocketEvent, WebSocketError, Result as WsResult,
@@ -130,6 +131,18 @@ struct HuobiStatusEvent {
     pub ts: u64,
 }
 
+// {"status":"error","ts":1684650798105,"id":"id488","err-code":"bad-request","err-msg":"invalid symbol lmrusdt"}
+#[derive(Serialize, Deserialize, Debug)]
+struct HuobiErrorEvent {
+    pub status: String,
+    pub ts: u64,
+    pub id: String,
+    #[serde(rename = "err-code")]
+    pub err_code: String,
+    #[serde(rename = "err-msg")]
+    pub err_msg: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum HuobiWebsocketEvent {
@@ -137,6 +150,7 @@ enum HuobiWebsocketEvent {
     BookTickerEvent(HuobiBookTickerEvent),
     PingEvent(HuobiPingEvent),
     StatusEvent(HuobiStatusEvent),
+    ErrorEvent(HuobiErrorEvent),
 }
 
 /// Structure to provide multiple websocket connections at once,
@@ -241,7 +255,15 @@ impl<'a> HuobiWebsocket<'a> {
                         let mut decoder = Decoder::new(&bin[..]).unwrap();
                         let mut text = String::new();
                         decoder.read_to_string(&mut text).unwrap();
-                        let event: HuobiWebsocketEvent = serde_json::from_str(&text).unwrap();
+                        let event = serde_json::from_str::<HuobiWebsocketEvent>(&text);
+
+                        let event = match event {
+                            Ok(event) => event,
+                            Err(e) => {
+                                error!("Received invalid JSON: {}", e);
+                                continue;
+                            }
+                        };
 
                         let ws_event = match event {
                             HuobiWebsocketEvent::KLineEvent(event) => {
@@ -261,6 +283,10 @@ impl<'a> HuobiWebsocket<'a> {
                             }
                             HuobiWebsocketEvent::BookTickerEvent(event) => {
                                 WebsocketEvent::BookTickerEvent(event.into())
+                            }
+                            HuobiWebsocketEvent::ErrorEvent(event) => {
+                                warn!("Received error event: {:?}", event);
+                                continue;
                             }
                         };
 
@@ -358,6 +384,32 @@ fn test_huobi_book_ticker() {
             assert_eq!(book_ticker_event.tick.ask_size, 0.86);
             assert_eq!(book_ticker_event.tick.last_price, 26274.0);
             assert_eq!(book_ticker_event.tick.last_size, 9.47E-4);
+        }
+        _ => {
+            panic!("Unexpected event type");
+        }
+    }
+}
+
+// {"status":"error","ts":1684650798105,"id":"id488","err-code":"bad-request","err-msg":"invalid symbol lmrusdt"}
+#[test]
+fn test_error_event_from_json() {
+    let json = r#"{
+        "status":"error",
+        "ts":1684650798105,
+        "id":"id488",
+        "err-code":"bad-request",
+        "err-msg":"invalid symbol lmrusdt"
+    }"#;
+    let event: HuobiWebsocketEvent = serde_json::from_str(json).unwrap();
+
+    match event {
+        HuobiWebsocketEvent::ErrorEvent(error_event) => {
+            assert_eq!(error_event.status, "error");
+            assert_eq!(error_event.ts, 1684650798105);
+            assert_eq!(error_event.id, "id488");
+            assert_eq!(error_event.err_code, "bad-request");
+            assert_eq!(error_event.err_msg, "invalid symbol lmrusdt");
         }
         _ => {
             panic!("Unexpected event type");
