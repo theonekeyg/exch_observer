@@ -15,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
-use crate::internal::{ObserverWorkerThreadData};
+use crate::internal::{ObserverWorkerThreadData, kraken_symbol};
 
 pub struct KrakenObserver<Symbol>
 where
@@ -97,7 +97,7 @@ where
                             let price_high = kline.high;
                             let price_low = kline.low;
                             let price = (price_high + price_low) / 2.0;
-                            let sym_index = kline.sym.clone().to_ascii_lowercase();
+                            let sym_index = kline.sym.clone();
                             let update_value = price_table.get(&sym_index).unwrap();
                             update_value
                                 .lock()
@@ -108,7 +108,7 @@ where
                         WebsocketEvent::BookTickerEvent(book) => {
                             let ask_price = book.best_ask;
                             let bid_price = book.best_bid;
-                            let sym_index = book.sym.clone().to_ascii_lowercase();
+                            let sym_index = book.sym.clone();
                             let update_value = price_table.get(&sym_index).unwrap();
                             update_value
                                 .lock()
@@ -147,7 +147,7 @@ where
     }
 
     fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Self::Values>>) {
-        let _symbol = <Symbol as Into<String>>::into(symbol.clone());
+        let _symbol = kraken_symbol(symbol.clone());
         if !self.price_table.contains_key(&_symbol) {
             // Since with this design it's impossible to modify external ExchangeValues from
             // thread, we're not required to lock the whole HashMap, since each thread modifies
@@ -202,13 +202,14 @@ where
                 self.symbols_in_queue.clear();
             }
 
-            info!("Added {} to the watching symbols", &symbol);
+            info!("Added {} to the watching symbols", &_symbol);
             self.watching_symbols.push(symbol.clone())
         }
     }
 
     fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
-        let symbol = <Symbol as Into<String>>::into(symbol.clone());
+        // let symbol = <Symbol as Into<String>>::into(symbol.clone());
+        let symbol = kraken_symbol(symbol.clone());
         self.price_table.get(&symbol)
     }
 
@@ -330,7 +331,7 @@ where
                         // mutable data directly from Arc. Although, this unsafe block should be
                         // safe, since we stopped the thread before.
                         let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-                        ptable_ptr.remove(&symbol.clone().into());
+                        ptable_ptr.remove(&kraken_symbol(symbol.clone()));
                     }
                 }
             }

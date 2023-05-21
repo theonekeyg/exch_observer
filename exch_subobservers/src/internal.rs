@@ -4,6 +4,7 @@ use std::{
     hash::Hash
 };
 use tokio::task::JoinHandle;
+use exch_observer_types::PairedExchangeSymbol;
 
 /// Internal data structure for the observer worker threads.
 /// Used to implement voting mechanism for symbols to stop their threads,
@@ -50,4 +51,8 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             .filter(|(_, &is_running)| is_running)
             .map(|(symbol, _)| symbol)
     }
+}
+
+pub fn kraken_symbol(symbol: impl PairedExchangeSymbol) -> String {
+    format!("{}/{}", symbol.base(), symbol.quote())
 }

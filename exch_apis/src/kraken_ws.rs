@@ -111,10 +111,63 @@ impl Into<KLine> for KrakenOHLCEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenSystemStatusEvent {
+    #[serde(rename = "connectionID")]
+    connection_id: u64,
+    event: String,
+    status: String,
+    version: String,
+}
+
+// {"event":"heartbeat"}
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenHeartbeatEvent {
+    event: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenSubscription {
+    depth: Option<i64>,
+    interval: Option<i64>,
+    maxratecount: Option<i64>,
+    name: String,
+    token: Option<String>,
+}
+
+impl KrakenSubscription {
+    #[allow(dead_code)]
+    pub fn with_name(name: String) -> Self {
+        Self {
+            depth: None,
+            interval: None,
+            maxratecount: None,
+            name: name,
+            token: None,
+        }
+    }
+}
+
+// {"channelID":564,"channelName":"ticker","event":"subscriptionStatus","pair":"ETH/USD","status":"subscribed","subscription":{"name":"ticker"}}
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenSubscriptionStatusEvent {
+    #[serde(rename = "channelID")]
+    channel_id: i64,
+    #[serde(rename = "channelName")]
+    channel_name: String,
+    event: String,
+    pair: String,
+    status: String,
+    subscription: KrakenSubscription,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 enum KrakenWebsocketEvent {
+    SystemStatusEvent(KrakenSystemStatusEvent),
+    SubscriptionStatusEvent(KrakenSubscriptionStatusEvent),
     BookTickerEvent(KrakenBookTickerEvent),
-    OHLCEvent(KrakenOHLCEvent)
+    OHLCEvent(KrakenOHLCEvent),
+    HeartbeatEvent(KrakenHeartbeatEvent)
 }
 
 /// Kraken base URL for websocket API
@@ -200,14 +253,17 @@ impl<'a> KrakenWebsocket<'a> {
 
                         let ws_event = match event {
                             KrakenWebsocketEvent::BookTickerEvent(e) => {
-                                WebsocketEvent::BookTickerEvent(e.into())
+                                Some(WebsocketEvent::BookTickerEvent(e.into()))
                             },
                             KrakenWebsocketEvent::OHLCEvent(e) => {
-                                WebsocketEvent::KLineEvent(e.into())
-                            }
+                                Some(WebsocketEvent::KLineEvent(e.into()))
+                            },
+                            _ => None // Ignore other events
                         };
 
-                        (self.handler)(ws_event).unwrap();
+                        if let Some(ws_event) = ws_event {
+                            (self.handler)(ws_event).unwrap();
+                        }
                     }
                     _ => {
                         panic!("Received some other message than binary: {:?}", msg);
@@ -281,6 +337,53 @@ fn test_ohlc_deserialization_from_json() {
         },
         channel: "ohlc-5".to_string(),
         symbol: "XBT/USD".to_string(),
+    });
+
+    assert_eq!(event, expected);
+}
+
+// {"connectionID":15775968476884074414,"event":"systemStatus","status":"online","version":"1.9.1"}
+#[test]
+fn test_system_status_from_json() {
+    let json = r#"{"connectionID":15775968476884074414,"event":"systemStatus","status":"online","version":"1.9.1"}"#;
+    let event: KrakenWebsocketEvent = serde_json::from_str(json).unwrap();
+
+    let expected = KrakenWebsocketEvent::SystemStatusEvent(KrakenSystemStatusEvent {
+        connection_id: 15775968476884074414,
+        event: "systemStatus".to_string(),
+        status: "online".to_string(),
+        version: "1.9.1".to_string(),
+    });
+
+    assert_eq!(event, expected);
+}
+
+// {"event":"heartbeat"}
+#[test]
+fn test_heartbeat_from_json() {
+    let json = r#"{"event":"heartbeat"}"#;
+    let event: KrakenWebsocketEvent = serde_json::from_str(json).unwrap();
+
+    let expected = KrakenWebsocketEvent::HeartbeatEvent(KrakenHeartbeatEvent {
+        event: "heartbeat".to_string(),
+    });
+
+    assert_eq!(event, expected);
+}
+
+// {"channelID":564,"channelName":"ticker","event":"subscriptionStatus","pair":"ETH/USD","status":"subscribed","subscription":{"name":"ticker"}}
+#[test]
+fn test_subscription_status_from_json() {
+    let json = r#"{"channelID":564,"channelName":"ticker","event":"subscriptionStatus","pair":"ETH/USD","status":"subscribed","subscription":{"name":"ticker"}}"#;
+    let event: KrakenWebsocketEvent = serde_json::from_str(json).unwrap();
+
+    let expected = KrakenWebsocketEvent::SubscriptionStatusEvent(KrakenSubscriptionStatusEvent {
+        channel_id: 564,
+        channel_name: "ticker".to_string(),
+        event: "subscriptionStatus".to_string(),
+        pair: "ETH/USD".to_string(),
+        status: "subscribed".to_string(),
+        subscription: KrakenSubscription::with_name("ticker".to_string())
     });
 
     assert_eq!(event, expected);
