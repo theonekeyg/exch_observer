@@ -2,6 +2,15 @@ use std::{default::Default, fs::File, io::Read, path::Path};
 
 use serde::Deserialize;
 
+/// Struct representing the configuration for the Kraken observer
+#[derive(Debug, Clone, Deserialize)]
+pub struct KrakenConfig {
+    pub api_key: Option<String>,
+    pub api_secret: Option<String>,
+    /// Path to .csv file containing symbols to monitor
+    pub symbols_path: String,
+}
+
 /// Struct representing the configuration for the Binance observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct BinanceConfig {
@@ -42,6 +51,7 @@ impl Default for RpcConfig {
 pub struct ObserverConfig {
     pub binance: Option<BinanceConfig>,
     pub huobi: Option<HuobiConfig>,
+    pub kraken: Option<KrakenConfig>,
 }
 
 /// Struct representing the configuration for the `exch_observer` binary
