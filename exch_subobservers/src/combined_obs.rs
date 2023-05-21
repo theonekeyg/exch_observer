@@ -1,4 +1,4 @@
-use crate::{BinanceObserver, HuobiObserver};
+use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
 use csv::{Reader, StringRecord};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
@@ -145,6 +145,12 @@ where
                 .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
         }
 
+        if let Some(_) = &self.config.kraken {
+            let kraken_observer = KrakenObserver::new(runtime.clone());
+            self.observers
+                .insert(ExchangeObserverKind::Kraken, Box::new(kraken_observer));
+        }
+
         Ok(())
     }
 
@@ -178,6 +184,24 @@ where
         if let Some(huobi_config) = &self.config.huobi {
             if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Huobi) {
                 let mut rdr = Reader::from_path(&huobi_config.symbols_path).unwrap();
+                for result in rdr.records() {
+                    let result = result.unwrap();
+
+                    let symbol = f(&result);
+                    if symbol.is_none() {
+                        continue;
+                    }
+
+                    let symbol = symbol.unwrap();
+                    observer
+                        .add_price_to_monitor(&symbol, Arc::new(Mutex::new(AskBidValues::new())));
+                }
+            }
+        }
+
+        if let Some(kraken_config) = &self.config.kraken {
+            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Kraken) {
+                let mut rdr = Reader::from_path(&kraken_config.symbols_path).unwrap();
                 for result in rdr.records() {
                     let result = result.unwrap();
 
