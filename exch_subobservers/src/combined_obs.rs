@@ -257,6 +257,10 @@ where
             huobi_observer.start()?;
         }
 
+        if let Some(kraken_observer) = self.observers.get_mut(&ExchangeObserverKind::Kraken) {
+            kraken_observer.start()?;
+        }
+
         self.is_running = true;
         Ok(())
     }
