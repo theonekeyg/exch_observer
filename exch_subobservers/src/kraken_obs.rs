@@ -4,7 +4,7 @@ use exch_apis::{
 };
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder, USD_STABLES
+    PairedExchangeSymbol, SwapOrder
 };
 use log::{debug, info, trace};
 use std::{
@@ -16,6 +16,8 @@ use std::{
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
 use crate::internal::{ObserverWorkerThreadData, kraken_symbol};
+
+pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
 
 pub struct KrakenObserver<Symbol>
 where
@@ -216,14 +218,14 @@ where
     fn get_usd_value(&self, sym: &String) -> Option<f64> {
         // TODO: This lock USD wrapped tokens to 1 seems to be unnecessary,
         // considering to remove this later
-        if let Some(_) = USD_STABLES.into_iter().find(|v| v == sym) {
+        if let Some(_) = KRAKEN_USD_STABLES.into_iter().find(|v| v == sym) {
             return Some(1.0);
         };
 
         let connected = self.get_interchanged_symbols(sym);
 
         for ordered_sym in connected.iter() {
-            for stable in &USD_STABLES {
+            for stable in &KRAKEN_USD_STABLES {
                 if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
                     || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
                 {
