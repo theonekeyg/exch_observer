@@ -68,7 +68,7 @@ impl Into<BookTick> for KrakenBookTickerEvent {
         let best_bid = self.data.bid.price.parse::<f64>().unwrap();
 
         BookTick {
-            sym: self.symbol.clone(),
+            sym: self.symbol,
             best_ask: best_ask,
             best_bid: best_bid,
         }
@@ -99,7 +99,7 @@ struct KrakenOHLCEvent {
 impl Into<KLine> for KrakenOHLCEvent {
     fn into(self) -> KLine {
         KLine {
-            sym: self.symbol.clone(),
+            sym: self.symbol,
             open: self.data.open.parse::<f64>().unwrap(),
             close: self.data.close.parse::<f64>().unwrap(),
             low: self.data.low.parse::<f64>().unwrap(),
@@ -161,11 +161,45 @@ struct KrakenSubscriptionStatusEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenSpreadData {
+    bid: String,
+    ask: String,
+    timestamp: String,
+    #[serde(rename = "bidVolume")]
+    bid_volume: String,
+    #[serde(rename = "askVolume")]
+    ask_volume: String,
+}
+
+// [53,["1.34948","1.35017","1684769251.100692","1447.38977961","188.82000000"],"spread","USD/CAD"]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct KrakenSpreadEvent {
+    channel_id: i64,
+    data: KrakenSpreadData,
+    channel: String,
+    symbol: String,
+}
+
+impl Into<BookTick> for KrakenSpreadEvent {
+    fn into(self) -> BookTick {
+        let best_bid = self.data.bid.parse::<f64>().unwrap();
+        let best_ask = self.data.ask.parse::<f64>().unwrap();
+
+        BookTick {
+            sym: self.symbol,
+            best_ask: best_ask,
+            best_bid: best_bid,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 enum KrakenWebsocketEvent {
     SystemStatusEvent(KrakenSystemStatusEvent),
-    SubscriptionStatusEvent(KrakenSubscriptionStatusEvent),
+    SpreadEvent(KrakenSpreadEvent),
     BookTickerEvent(KrakenBookTickerEvent),
+    SubscriptionStatusEvent(KrakenSubscriptionStatusEvent),
     OHLCEvent(KrakenOHLCEvent),
     HeartbeatEvent(KrakenHeartbeatEvent)
 }
@@ -210,7 +244,7 @@ impl<'a> KrakenWebsocket<'a> {
                 \"event\":\"subscribe\",
                 \"pair\":[\"{}\"],
                 \"subscription\":{{
-                    \"name\":\"ticker\"
+                    \"name\":\"spread\"
                 }}
             }}", subscription))).map_err(|e| WebSocketError::WriteError(e.to_string()))?;
         }
@@ -224,7 +258,7 @@ impl<'a> KrakenWebsocket<'a> {
                 \"event\": \"subscribe\",
                 \"pair\": {},
                 \"subscription\": {{
-                    \"name\": \"ticker\"
+                    \"name\": \"spread\"
                 }}
             }}", serde_json::to_string(&subscriptions).unwrap())))).unwrap();
         }
@@ -257,6 +291,9 @@ impl<'a> KrakenWebsocket<'a> {
                             },
                             KrakenWebsocketEvent::OHLCEvent(e) => {
                                 Some(WebsocketEvent::KLineEvent(e.into()))
+                            },
+                            KrakenWebsocketEvent::SpreadEvent(e) => {
+                                Some(WebsocketEvent::BookTickerEvent(e.into()))
                             },
                             _ => None // Ignore other events
                         };
@@ -384,6 +421,28 @@ fn test_subscription_status_from_json() {
         pair: "ETH/USD".to_string(),
         status: "subscribed".to_string(),
         subscription: KrakenSubscription::with_name("ticker".to_string())
+    });
+
+    assert_eq!(event, expected);
+}
+
+// [53,["1.34948","1.35017","1684769251.100692","1447.38977961","188.82000000"],"spread","USD/CAD"]
+#[test]
+fn test_spread_from_json() {
+    let json = r#"[53,["1.34948","1.35017","1684769251.100692","1447.38977961","188.82000000"],"spread","USD/CAD"]"#;
+    let event: KrakenWebsocketEvent = serde_json::from_str(json).unwrap();
+
+    let expected = KrakenWebsocketEvent::SpreadEvent(KrakenSpreadEvent {
+        channel_id: 53,
+        data: KrakenSpreadData {
+            bid: "1.34948".to_string(),
+            ask: "1.35017".to_string(),
+            timestamp: "1684769251.100692".to_string(),
+            bid_volume: "1447.38977961".to_string(),
+            ask_volume: "188.82000000".to_string(),
+        },
+        channel: "spread".to_string(),
+        symbol: "USD/CAD".to_string(),
     });
 
     assert_eq!(event, expected);
