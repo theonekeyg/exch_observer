@@ -1,4 +1,4 @@
-use binance::{account::OrderSide, errors::Result as BResult, model::Balance as BinanceBalance};
+use binance::{account::OrderSide, model::Balance as BinanceBalance};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -439,7 +439,8 @@ pub trait ExchangeClient<Symbol: Eq + Hash> {
     /// Makes sell order on the exchange
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64);
 
-    fn get_balances(&self) -> BResult<HashMap<String, ExchangeBalance>>;
+    /// Fetches balances for the current user whose api key is used
+    fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>>;
 }
 
 impl Into<ExchangeBalance> for BinanceBalance {

@@ -1,7 +1,6 @@
 use binance::{
     account::{Account, OrderSide, OrderType, TimeInForce},
     api::Binance,
-    errors::Result as BResult,
     market::Market,
 };
 use exch_observer_types::{ExchangeBalance, ExchangeClient};
@@ -165,7 +164,7 @@ where
     }
 
     /// Fetches the balances for all assets from Binance Account API
-    fn get_balances(&self) -> BResult<HashMap<String, ExchangeBalance>> {
+    fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
         let account_info = self.account.get_account()?;
 
         let mut balances: HashMap<String, ExchangeBalance> = HashMap::new();
