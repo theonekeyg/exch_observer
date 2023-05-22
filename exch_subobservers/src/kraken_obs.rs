@@ -239,7 +239,7 @@ where
     }
 
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("Starting Binance Observer");
+        info!("Starting Kraken Observer");
 
         if self.symbols_in_queue.len() > 0 {
             let thread_data = Arc::new(ObserverWorkerThreadData::from(
