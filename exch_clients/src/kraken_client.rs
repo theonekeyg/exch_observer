@@ -160,7 +160,7 @@ where
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
-            panic!("No runtime set for BinanceClient, cannot execute buy order");
+            panic!("No runtime set for KrakenClient, cannot execute buy order");
         };
         Self::buy_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
     }
@@ -170,7 +170,7 @@ where
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
-            panic!("No runtime set for BinanceClient, cannot execute sell order");
+            panic!("No runtime set for KrakenClient, cannot execute sell order");
         };
         Self::sell_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
     }
