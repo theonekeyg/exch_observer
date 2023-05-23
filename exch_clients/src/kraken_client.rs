@@ -12,7 +12,7 @@ use krakenrs::{
     OrderFlag, BsType
 };
 use log::{info, error};
-use exch_observer_types::{ExchangeBalance, ExchangeClient};
+use exch_observer_types::{ExchangeBalance, ExchangeClient, PairedExchangeSymbol};
 
 
 /// Interface to Kraken REST API.
@@ -135,18 +135,27 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String>
 
 impl<Symbol> ExchangeClient<Symbol> for KrakenClient<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String>,
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + PairedExchangeSymbol,
 {
     fn symbol_exists(&self, symbol: &Symbol) -> bool {
-        true
+        let pairs = self.api.asset_pairs(vec![symbol.pair()]);
+        return pairs.is_ok() && pairs.unwrap().len() > 0;
     }
 
-    /// Fetches the balance for the given asset from Binance Account API
+    /// Fetches the balance for the given asset from Kraken API
     fn get_balance(&self, asset: &String) -> Option<ExchangeBalance> {
-        None
+        let res = self.api.get_asset_balance(&asset.clone()).unwrap();
+        let balance = res.get(&asset.clone()).unwrap();
+        let rv = ExchangeBalance::new(
+            asset.clone(),
+            (*balance).try_into().unwrap(),
+            0.0
+        );
+
+        Some(rv)
     }
 
-    /// Sends Buy GTC limit order to Binance REST API
+    /// Sends Buy GTC limit order to Kraken REST API
     fn buy_order(&self, symbol: &Symbol, qty: f64, price: f64) {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
@@ -156,7 +165,7 @@ where
         Self::buy_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
     }
 
-    /// Sends Sell GTC limit order to Binance REST API
+    /// Sends Sell GTC limit order to Kraken REST API
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64) {
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
@@ -166,8 +175,19 @@ where
         Self::sell_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
     }
 
-    /// Fetches the balances for all assets from Binance Account API
+    /// Fetches the balances for all assets from Kraken API
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
-        Ok(HashMap::new())
+        let mut rv_map: HashMap<String, ExchangeBalance> = HashMap::new();
+
+        for (key, val) in self.api.get_account_balance().unwrap().iter() {
+            let balance = ExchangeBalance::new(
+                key.clone(),
+                (*val).try_into().unwrap(),
+                0.0
+            );
+            rv_map.insert(key.clone(), balance);
+        }
+
+        Ok(rv_map)
     }
 }

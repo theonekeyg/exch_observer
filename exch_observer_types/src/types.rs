@@ -21,7 +21,7 @@ pub trait PairedExchangeSymbol {
     fn quote(&self) -> &str;
     /// Returns the name of the trading pair
     /// (e.g. `ethbtc` on Binance, `XXBTZUSD` on Kraken)
-    fn pair(self) -> String;
+    fn pair(&self) -> String;
 }
 
 /// Very basic symbol structure, used in the observer RPC server.
@@ -42,7 +42,7 @@ impl PairedExchangeSymbol for ExchangeSymbol {
         &self.quote
     }
 
-    fn pair(self) -> String {
+    fn pair(&self) -> String {
         self.into()
     }
 }
