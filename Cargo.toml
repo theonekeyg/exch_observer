@@ -20,6 +20,7 @@ edition = "2021"
 
 [workspace.dependencies]
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
+krakenrs = { git = "https://github.com/theonekeyg/krakenrs" }
 clap = { version = "4.2.1", features = ["derive"] }
 csv = "1.2.1"
 dotenvy = "0.15.6"
