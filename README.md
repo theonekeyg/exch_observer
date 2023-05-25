@@ -10,8 +10,8 @@ latency) and data-tracking (because of high throughput) applications. It can be
 used as a library as well as using local (or remote) server through RPC client.
 
 The `exch_observer` design allows to subscribe to high amount of trading pairs
-at once (`>1300` on Binance and **all pairs** on Huobi), getting an instant
-responses on updates using (where exists) WebSocket APIs.
+at once (`>1300` on Binance and **all pairs** on Kraken and Huobi), getting
+updates using (where exists) WebSocket APIs.
 
 ## Usage
 
