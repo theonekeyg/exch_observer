@@ -1,35 +1,44 @@
-use binance::{
-    account::{Account, OrderSide, OrderType, TimeInForce},
-    api::Binance,
-    market::Market,
-};
-use exch_observer_types::{ExchangeBalance, ExchangeClient};
-use log::info;
-use std::sync::Arc;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
+    sync::Arc,
     marker::PhantomData,
+    iter::Iterator,
+    convert::From
 };
+use log::info;
 use tokio::runtime::Runtime;
+use binance::{
+    account::{Account, OrderSide, OrderType, TimeInForce},
+    model::Symbol as BSymbol,
+    api::Binance,
+    market::Market,
+    general::General
+};
+use exch_observer_types::{ExchangeBalance, ExchangeClient};
 
 /// Client for the Binance REST API, implemented using
 /// `https://github.com/wisespace-io/binance-rs.git` crate
-pub struct BinanceClient<Symbol: Eq + Hash> {
+pub struct BinanceClient<Symbol: Eq + Hash + From<BSymbol>> {
     /// Account API
     pub account: Arc<Account>,
     /// Market API
     pub market: Arc<Market>,
+    /// General API
+    pub general: Arc<General>,
     pub runtime: Option<Arc<Runtime>>,
     marker: PhantomData<Symbol>,
 }
 
-impl<Symbol: Eq + Hash + Clone + Display + Debug + Into<String>> BinanceClient<Symbol> {
+impl<Symbol> BinanceClient<Symbol>
+where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<BSymbol>
+{
     pub fn new(api_key: Option<String>, secret_key: Option<String>) -> Self {
         Self {
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
-            market: Arc::new(Market::new(api_key, secret_key)),
+            market: Arc::new(Market::new(api_key.clone(), secret_key.clone())),
+            general: Arc::new(General::new(api_key, secret_key)),
             runtime: None,
             marker: PhantomData,
         }
@@ -42,7 +51,8 @@ impl<Symbol: Eq + Hash + Clone + Display + Debug + Into<String>> BinanceClient<S
     ) -> Self {
         Self {
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
-            market: Arc::new(Market::new(api_key, secret_key)),
+            market: Arc::new(Market::new(api_key.clone(), secret_key.clone())),
+            general: Arc::new(General::new(api_key, secret_key)),
             runtime: Some(async_runner),
             marker: PhantomData,
         }
@@ -117,11 +127,24 @@ impl<Symbol: Eq + Hash + Clone + Display + Debug + Into<String>> BinanceClient<S
             recipe
         });
     }
+
+    /// Fetches symbols from the exchange
+    fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        let symbols = self.general.exchange_info()?.symbols;
+        Ok(symbols
+            .iter()
+            .map(|s| {
+                let symbol: Symbol = From::<BSymbol>::from(s.clone());
+                symbol
+            })
+            .collect()
+        )
+    }
 }
 
 impl<Symbol> ExchangeClient<Symbol> for BinanceClient<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String>,
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<BSymbol>,
 {
     fn symbol_exists(&self, symbol: &Symbol) -> bool {
         self.market
@@ -173,5 +196,9 @@ where
         }
 
         Ok(balances)
+    }
+
+    fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        self.fetch_and_convert_symbols()
     }
 }

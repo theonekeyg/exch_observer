@@ -1,5 +1,6 @@
 use binance::{account::OrderSide, model::Balance as BinanceBalance};
 use serde::{Deserialize, Serialize};
+use binance::{model::Symbol as BSymbol};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -31,6 +32,15 @@ pub trait PairedExchangeSymbol {
 pub struct ExchangeSymbol {
     pub base: String,
     pub quote: String,
+}
+
+impl From<BSymbol> for ExchangeSymbol {
+    fn from(symbol: BSymbol) -> Self {
+        Self {
+            base: symbol.base_asset.clone(),
+            quote: symbol.quote_asset,
+        }
+    }
 }
 
 impl PairedExchangeSymbol for ExchangeSymbol {
@@ -448,6 +458,9 @@ pub trait ExchangeClient<Symbol: Eq + Hash> {
 
     /// Fetches balances for the current user whose api key is used
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>>;
+
+    /// Fetches all symbols from the exchange and returns list of symbols
+    fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>>;
 }
 
 impl Into<ExchangeBalance> for BinanceBalance {

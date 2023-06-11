@@ -1,5 +1,6 @@
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
 use csv::{Reader, StringRecord};
+use binance::{model::Symbol as BSymbol};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
@@ -17,14 +18,14 @@ use tokio::runtime::Runtime;
 
 struct ExchangeClientsTuple<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
 {
     pub binance_client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
 }
 
 impl<Symbol> ExchangeClientsTuple<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + 'static,
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -51,6 +52,7 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Into<String>
+        + From<BSymbol>
         + Send
         + Sync
         + 'static,
@@ -76,6 +78,7 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Send
+        + From<BSymbol>
         + Sync
         + 'static,
 {

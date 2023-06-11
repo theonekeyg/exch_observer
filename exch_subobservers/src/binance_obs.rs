@@ -1,5 +1,6 @@
 use binance::{
     errors::Result as BResult,
+    model::Symbol as BSymbol,
     websockets::{WebSockets, WebsocketEvent},
 };
 // use csv::{Reader, StringRecord};
@@ -97,6 +98,7 @@ where
         + Send
         + Sync
         + PairedExchangeSymbol
+        + From<BSymbol>
         + 'static,
 {
     pub watching_symbols: Vec<Symbol>,
@@ -135,6 +137,7 @@ where
         + Into<String>
         + Send
         + Sync
+        + From<BSymbol>
         + PairedExchangeSymbol
         + 'static,
 {
@@ -228,6 +231,7 @@ where
         + PairedExchangeSymbol
         + Send
         + Sync
+        + From<BSymbol>
         + 'static,
 {
     type Values = AskBidValues;

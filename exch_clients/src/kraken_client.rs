@@ -9,7 +9,7 @@ use std::{
 use tokio::runtime::Runtime;
 use krakenrs::{
     KrakenRestAPI, KrakenCredentials, KrakenRestConfig, LimitOrder,
-    OrderFlag, BsType
+    OrderFlag, BsType, AssetPair
 };
 use log::{info, error};
 use exch_observer_types::{ExchangeBalance, ExchangeClient, PairedExchangeSymbol};
@@ -23,7 +23,7 @@ pub struct KrakenClient<Symbol: Eq + Hash> {
 }
 
 impl<Symbol> KrakenClient<Symbol>
-where Symbol: Eq + Hash + Clone + Display + Debug + Into<String>
+where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair>
 {
     pub fn new(api_key: String, api_secret: String) -> Self {
 
@@ -131,11 +131,27 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String>
 
         });
     }
+
+    /// Fetches symbols from the exchange
+    fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        let symbols = self.api.asset_pairs(vec![]).unwrap();
+        // TODO: Rewrite this function to return Iterator instead of Vec.
+        // This function doesn't need to return collected Vec,
+        // instead returning the iterator would be far more better solution.
+        Ok(symbols
+            .iter()
+            .map(|(_, v)| {
+                let symbol: Symbol = From::<AssetPair>::from(v.clone());
+                symbol
+            })
+            .collect()
+        )
+    }
 }
 
 impl<Symbol> ExchangeClient<Symbol> for KrakenClient<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + PairedExchangeSymbol,
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair> + PairedExchangeSymbol,
 {
     fn symbol_exists(&self, symbol: &Symbol) -> bool {
         let pairs = self.api.asset_pairs(vec![symbol.pair()]);
@@ -189,5 +205,9 @@ where
         }
 
         Ok(rv_map)
+    }
+
+    fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        self.fetch_and_convert_symbols()
     }
 }
