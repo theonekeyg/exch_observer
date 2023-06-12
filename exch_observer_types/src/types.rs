@@ -1,6 +1,3 @@
-use binance::{account::OrderSide, model::Balance as BinanceBalance};
-use serde::{Deserialize, Serialize};
-use binance::{model::Symbol as BSymbol};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -9,7 +6,13 @@ use std::{
     sync::{Arc, Mutex},
     str::FromStr
 };
-
+use binance::{
+    account::OrderSide,
+    model::{Balance as BinanceBalance, Symbol as BSymbol, Filters as BFilters},
+};
+use serde::{Deserialize, Serialize};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use exch_observer_utils::get_current_timestamp;
 
 pub static USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
@@ -105,6 +108,144 @@ impl Display for ExchangeSymbol {
 }
 
 impl Eq for ExchangeSymbol {}
+
+#[derive(Debug, Clone, Hash)]
+pub struct ArbitrageExchangeSymbol {
+    pub inner: ExchangeSymbol,
+    pub pair_name: String,
+    pub min_price: Decimal,
+    pub base_precision: u8,
+    pub qty_step_size: Decimal,
+    pub price_tick_size: Decimal,
+    pub min_notional: Decimal,
+    pub min_qty: Decimal,
+}
+
+impl PairedExchangeSymbol for ArbitrageExchangeSymbol {
+    fn base(&self) -> &str {
+        self.inner.base()
+    }
+
+    fn quote(&self) -> &str {
+        self.inner.quote()
+    }
+
+    fn pair(&self) -> String {
+        self.pair_name.clone()
+    }
+}
+
+impl Into<String> for ArbitrageExchangeSymbol {
+    fn into(self) -> String {
+        self.inner.into()
+    }
+}
+
+impl Into<String> for &ArbitrageExchangeSymbol {
+    fn into(self) -> String {
+        self.inner.to_string()
+    }
+}
+
+impl From<BSymbol> for ArbitrageExchangeSymbol {
+    /// Converts a Binance symbol into an ArbitrageExchangeSymbol
+    fn from(symbol: BSymbol) -> Self {
+        let base_asset = symbol.base_asset;
+        let quote_asset = symbol.quote_asset;
+        let inner = ExchangeSymbol::new(base_asset, quote_asset);
+        let pair_name = symbol.symbol;
+        let mut min_price = dec!(0.00000000);
+        let base_precision = symbol.base_asset_precision as u8;
+        let mut qty_step_size = dec!(0.00000001);
+        let mut price_tick_size = dec!(0.00000001);
+        let mut min_notional = dec!(0.00000001);
+        let mut min_qty = dec!(0.00000001);
+
+        // On binance, most limits are enforced by filters.
+        for filt in symbol.filters {
+            match filt {
+                BFilters::PriceFilter {
+                    min_price: min,
+                    max_price: _,
+                    tick_size,
+                } => {
+                    min_price = Decimal::from_str(&min).unwrap();
+                    price_tick_size = Decimal::from_str(&tick_size).unwrap();
+                }
+                BFilters::LotSize {
+                    min_qty: min,
+                    max_qty: _,
+                    step_size,
+                } => {
+                    min_qty = Decimal::from_str(&min).unwrap();
+                    qty_step_size = Decimal::from_str(&step_size).unwrap();
+                }
+                BFilters::MinNotional {
+                    notional: _,
+                    min_notional: min,
+                    apply_to_market: _,
+                    avg_price_mins: _,
+                } => {
+                    min_notional = Decimal::from_str(&min.unwrap()).unwrap();
+                }
+                _ => {}
+            }
+        }
+
+        Self {
+            inner: inner,
+            pair_name: pair_name,
+            min_price: min_price,
+            base_precision: base_precision,
+            qty_step_size: qty_step_size,
+            price_tick_size: price_tick_size,
+            min_notional: min_notional,
+            min_qty: min_qty,
+        }
+    }
+}
+
+impl ArbitrageExchangeSymbol {
+    pub fn new<S>(
+        base: S,
+        quote: S,
+        pair_name: S,
+        min_price: Decimal,
+        base_precision: u8,
+        qty_step_size: Decimal,
+        price_tick_size: Decimal,
+        min_notional: Decimal,
+        min_qty: Decimal,
+    ) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            inner: ExchangeSymbol::new(base, quote),
+            pair_name: pair_name.into(),
+            min_price: min_price,
+            base_precision: base_precision,
+            qty_step_size: qty_step_size,
+            price_tick_size: price_tick_size,
+            min_notional: min_notional,
+            min_qty: min_qty,
+        }
+    }
+}
+
+impl PartialEq for ArbitrageExchangeSymbol {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl Display for ArbitrageExchangeSymbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", Into::<String>::into(self))
+    }
+}
+
+impl Eq for ArbitrageExchangeSymbol {}
 
 /// SwapOrder represents buy/sell orders.
 #[derive(Debug, Eq, Hash, PartialEq, Copy, Clone)]

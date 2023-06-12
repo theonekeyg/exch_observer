@@ -25,6 +25,8 @@ clap = { version = "4.2.1", features = ["derive"] }
 csv = "1.2.1"
 dotenvy = "0.15.6"
 env_logger = "0.10.0"
+rust_decimal = "1.29.1"
+rust_decimal_macros = "1.29.1"
 exch_clients = { path = "exch_clients" }
 exch_observer = { path = "exch_observer" }
 exch_observer_config = { path = "exch_observer_config" }
