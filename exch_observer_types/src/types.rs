@@ -557,7 +557,7 @@ impl FromStr for ExchangeObserverKind {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
+        Ok(match s.to_lowercase().as_str() {
             "binance" => Self::Binance,
             "bitfinex" => Self::Bitfinex,
             "bitmex" => Self::Bitmex,
