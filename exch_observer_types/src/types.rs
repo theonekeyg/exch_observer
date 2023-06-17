@@ -109,15 +109,26 @@ impl Display for ExchangeSymbol {
 
 impl Eq for ExchangeSymbol {}
 
+/// Generic symbol on the exchange. Meant to have everything that
+/// any exchange would have.
 #[derive(Debug, Clone, Hash)]
 pub struct ArbitrageExchangeSymbol {
+    /// Base and Quote tokens
     pub inner: ExchangeSymbol,
+    /// Pair name (e.g. `ethbtc` on Binance, `XXBTZUSD` on Kraken)
+    /// mostly used to correct Websocket connections
     pub pair_name: String,
+    /// Minimum price for the symbol
     pub min_price: Decimal,
+    /// Precision of a base symbol
     pub base_precision: u8,
+    /// Precision of a quote symbol for a bid
     pub qty_step_size: Decimal,
+    /// Precision of price for a bid
     pub price_tick_size: Decimal,
+    /// Minimum notional value for a symbol
     pub min_notional: Decimal,
+    /// Minimum quantity for a symbol
     pub min_qty: Decimal,
 }
 
