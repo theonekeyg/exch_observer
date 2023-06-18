@@ -1,19 +1,20 @@
+use binance::{
+    account::OrderSide,
+    model::{Balance as BinanceBalance, Filters as BFilters, Symbol as BSymbol},
+};
+use exch_observer_utils::get_current_timestamp;
+use krakenrs::AssetPair;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::Debug,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
+    str::FromStr,
     sync::{Arc, Mutex},
-    str::FromStr
 };
-use binance::{
-    account::OrderSide,
-    model::{Balance as BinanceBalance, Symbol as BSymbol, Filters as BFilters},
-};
-use serde::{Deserialize, Serialize};
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
-use exch_observer_utils::get_current_timestamp;
 
 pub static USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
@@ -216,6 +217,34 @@ impl From<BSymbol> for ArbitrageExchangeSymbol {
     }
 }
 
+impl From<AssetPair> for ArbitrageExchangeSymbol {
+    fn from(symbol: AssetPair) -> Self {
+        // Split symbol.wsname into base and quote, since we don't need the wsname
+        let wsname = symbol.wsname.unwrap();
+        let mut split = wsname.split('/');
+        let base_asset = split.next().unwrap();
+        let quote_asset = split.next().unwrap();
+        let min_price = symbol.costmin.unwrap();
+        let base_precision: u8 = symbol.cost_decimals.try_into().unwrap();
+        let qty_step_size = 1 / ((10 as u64).pow(symbol.pair_decimals.try_into().unwrap()));
+        let price_tick_size = symbol.tick_size.unwrap();
+        let min_notional = symbol.costmin.unwrap();
+        let min_qty = symbol.ordermin.unwrap();
+
+        Self::new(
+            base_asset,
+            quote_asset,
+            &wsname,
+            min_price,
+            base_precision,
+            qty_step_size.into(),
+            price_tick_size,
+            min_notional,
+            min_qty,
+        )
+    }
+}
+
 impl ArbitrageExchangeSymbol {
     pub fn new<S>(
         base: S,
@@ -349,7 +378,7 @@ pub trait ExchangeValues {
 #[derive(Debug, Clone)]
 pub struct ExchangeSingleValues {
     pub base_price: f64,
-    pub update_timestamp: u64
+    pub update_timestamp: u64,
 }
 
 unsafe impl Send for ExchangeSingleValues {}
@@ -360,7 +389,7 @@ impl ExchangeSingleValues {
     pub fn new() -> Self {
         Self {
             base_price: 0.0,
-            update_timestamp: 0
+            update_timestamp: 0,
         }
     }
 
@@ -368,7 +397,7 @@ impl ExchangeSingleValues {
     pub fn new_with_prices(base_price: f64) -> Self {
         Self {
             base_price: base_price,
-            update_timestamp: get_current_timestamp().unwrap()
+            update_timestamp: get_current_timestamp().unwrap(),
         }
     }
 }
@@ -414,7 +443,7 @@ impl ExchangeValues for ExchangeSingleValues {
 pub struct AskBidValues {
     pub ask_price: f64,
     pub bid_price: f64,
-    pub update_timestamp: u64
+    pub update_timestamp: u64,
 }
 unsafe impl Send for AskBidValues {}
 unsafe impl Sync for AskBidValues {}
@@ -425,7 +454,7 @@ impl AskBidValues {
         Self {
             ask_price: 0.0,
             bid_price: 0.0,
-            update_timestamp: 0
+            update_timestamp: 0,
         }
     }
 
@@ -434,7 +463,7 @@ impl AskBidValues {
         Self {
             ask_price: ask_price,
             bid_price: bid_price,
-            update_timestamp: get_current_timestamp().unwrap()
+            update_timestamp: get_current_timestamp().unwrap(),
         }
     }
 }
@@ -624,4 +653,3 @@ impl Into<ExchangeBalance> for BinanceBalance {
         )
     }
 }
-

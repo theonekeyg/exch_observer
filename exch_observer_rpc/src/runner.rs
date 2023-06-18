@@ -14,8 +14,8 @@ use log::{debug, info};
 use std::{
     marker::Sync,
     net::SocketAddr,
+    str::FromStr,
     sync::{Arc, RwLock},
-    str::FromStr
 };
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -52,7 +52,6 @@ impl ExchObserver for GrpcObserver {
         &self,
         request: Request<GetPriceRequest>,
     ) -> Result<Response<GetPriceResponse>, Status> {
-
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
         let symbol = ExchangeSymbol::from(&request.base, &request.quote);
@@ -76,7 +75,7 @@ impl ExchObserver for GrpcObserver {
             base: request.base,
             quote: request.quote,
             price: price,
-            timestamp: timestamp
+            timestamp: timestamp,
         }))
     }
 }
@@ -168,7 +167,12 @@ impl ObserverRpcClient {
     /// * `exchange` - The exchange to query
     /// * `base` - The base symbol
     /// * `quote` - The quote symbol
-    pub async fn get_price_with_timestamp(&mut self, exchange: &str, base: &str, quote: &str) -> (f64, u64) {
+    pub async fn get_price_with_timestamp(
+        &mut self,
+        exchange: &str,
+        base: &str,
+        quote: &str,
+    ) -> (f64, u64) {
         debug!(
             "Fetching price for symbol {}{} on exchange {}",
             base, quote, exchange

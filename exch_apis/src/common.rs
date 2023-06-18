@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize, Deserialize};
 
 /// Our internal struct to represent KLine data tick
 #[derive(Serialize, Deserialize, Debug)]

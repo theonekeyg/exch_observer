@@ -1,6 +1,6 @@
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
+use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
-use binance::{model::Symbol as BSymbol};
 use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
@@ -18,14 +18,16 @@ use tokio::runtime::Runtime;
 
 struct ExchangeClientsTuple<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
+    Symbol:
+        Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
 {
     pub binance_client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
 }
 
 impl<Symbol> ExchangeClientsTuple<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
+    Symbol:
+        Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -160,7 +162,6 @@ where
     /// Loads symbols in the observer from the config, must be called after `create_observers` and
     /// before `launch`.
     pub fn load_symbols(&mut self, f: impl Fn(&StringRecord) -> Option<Symbol>) {
-
         // Load symbols from csv file, pass them to provided closure,
         // and add them to each observer we had in the config.
 

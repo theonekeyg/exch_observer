@@ -14,14 +14,14 @@ use std::{
     sync::{Arc, Mutex, RwLock},
     vec::Vec,
 };
-use tokio::{task::JoinHandle, runtime::Runtime};
+use tokio::{runtime::Runtime, task::JoinHandle};
 
+use crate::internal::ObserverWorkerThreadData;
 use exch_clients::BinanceClient;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder, USD_STABLES
+    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
+    SwapOrder, USD_STABLES,
 };
-use crate::internal::{ObserverWorkerThreadData};
 
 #[allow(unused)]
 fn all_ticker_stream() -> &'static str {
@@ -119,7 +119,10 @@ where
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<ObserverWorkerThreadData<Symbol>>>,
-    running_handles: Vec<(JoinHandle<BResult<()>>, Arc<ObserverWorkerThreadData<Symbol>>)>,
+    running_handles: Vec<(
+        JoinHandle<BResult<()>>,
+        Arc<ObserverWorkerThreadData<Symbol>>,
+    )>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -276,9 +279,7 @@ where
             self.symbols_in_queue.push(symbol.clone());
 
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
-                let thread_data = Arc::new(ObserverWorkerThreadData::from(
-                    &self.symbols_in_queue,
-                ));
+                let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
 
                 let handle = Self::launch_worker_multiple(
                     self.async_runner.deref(),
@@ -335,9 +336,7 @@ where
         info!("Starting Binance Observer");
 
         if self.symbols_in_queue.len() > 0 {
-            let thread_data = Arc::new(ObserverWorkerThreadData::from(
-                &self.symbols_in_queue,
-            ));
+            let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
 
             for sym in &self.symbols_in_queue {
                 self.threads_data_mapping
@@ -396,10 +395,7 @@ where
             // won't have to deal with locks in this communication between threads. As long as
             // only AtomicBool in this structure is used in subthreads, this is thread-safe.
             unsafe {
-                let mut data = self
-                    .threads_data_mapping
-                    .get_mut(&symbol)
-                    .unwrap();
+                let mut data = self.threads_data_mapping.get_mut(&symbol).unwrap();
 
                 let mut data = Arc::get_mut_unchecked(&mut data);
 

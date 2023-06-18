@@ -1,19 +1,17 @@
+use exch_observer_types::{ExchangeBalance, ExchangeClient, PairedExchangeSymbol};
+use krakenrs::{
+    AssetPair, BsType, KrakenCredentials, KrakenRestAPI, KrakenRestConfig, LimitOrder, OrderFlag,
+};
+use log::{error, info};
 use std::{
+    collections::{BTreeSet, HashMap},
+    fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    collections::{HashMap, BTreeSet},
     sync::Arc,
     time::Duration,
-    fmt::{Display, Debug},
 };
 use tokio::runtime::Runtime;
-use krakenrs::{
-    KrakenRestAPI, KrakenCredentials, KrakenRestConfig, LimitOrder,
-    OrderFlag, BsType, AssetPair
-};
-use log::{info, error};
-use exch_observer_types::{ExchangeBalance, ExchangeClient, PairedExchangeSymbol};
-
 
 /// Interface to Kraken REST API.
 pub struct KrakenClient<Symbol: Eq + Hash> {
@@ -23,14 +21,17 @@ pub struct KrakenClient<Symbol: Eq + Hash> {
 }
 
 impl<Symbol> KrakenClient<Symbol>
-where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair>,
 {
     pub fn new(api_key: String, api_secret: String) -> Self {
-
-        let creds = KrakenCredentials { key: api_key, secret: api_secret };
+        let creds = KrakenCredentials {
+            key: api_key,
+            secret: api_secret,
+        };
         let config = KrakenRestConfig {
             timeout: Duration::from_secs(10),
-            creds: creds
+            creds: creds,
         };
 
         let api = KrakenRestAPI::try_from(config).unwrap();
@@ -42,17 +43,15 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
         }
     }
 
-    pub fn new_with_runtime(
-        api_key: String,
-        api_secret: String,
-        runtime: Arc<Runtime>,
-    ) -> Self {
-
-        let creds = KrakenCredentials { key: api_key, secret: api_secret };
+    pub fn new_with_runtime(api_key: String, api_secret: String, runtime: Arc<Runtime>) -> Self {
+        let creds = KrakenCredentials {
+            key: api_key,
+            secret: api_secret,
+        };
 
         let config = KrakenRestConfig {
             timeout: Duration::from_secs(10),
-            creds: creds
+            creds: creds,
         };
 
         let api = KrakenRestAPI::try_from(config).unwrap();
@@ -90,7 +89,7 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
                     oflags: oflags,
                 },
                 None, // userref
-                false
+                false,
             );
 
             if let Ok(res) = res {
@@ -98,11 +97,16 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
             } else {
                 error!("Error placing buy order: {:?}", res.err().unwrap());
             }
-
         });
     }
 
-    fn sell_order1(runner: &Runtime, api: Arc<KrakenRestAPI>, symbol: Symbol, qty: f64, price: f64) {
+    fn sell_order1(
+        runner: &Runtime,
+        api: Arc<KrakenRestAPI>,
+        symbol: Symbol,
+        qty: f64,
+        price: f64,
+    ) {
         let symbol: String = symbol.into();
         runner.spawn_blocking(move || {
             info!(
@@ -120,7 +124,7 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
                     oflags: oflags,
                 },
                 None, // userref
-                false
+                false,
             );
 
             if let Ok(res) = res {
@@ -128,7 +132,6 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
             } else {
                 error!("Error placing buy order: {:?}", res.err().unwrap());
             }
-
         });
     }
 
@@ -144,14 +147,14 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPai
                 let symbol: Symbol = From::<AssetPair>::from(v.clone());
                 symbol
             })
-            .collect()
-        )
+            .collect())
     }
 }
 
 impl<Symbol> ExchangeClient<Symbol> for KrakenClient<Symbol>
 where
-    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair> + PairedExchangeSymbol,
+    Symbol:
+        Eq + Hash + Clone + Display + Debug + Into<String> + From<AssetPair> + PairedExchangeSymbol,
 {
     fn symbol_exists(&self, symbol: &Symbol) -> bool {
         let pairs = self.api.asset_pairs(vec![symbol.pair()]);
@@ -162,11 +165,7 @@ where
     fn get_balance(&self, asset: &String) -> Option<ExchangeBalance> {
         let res = self.api.get_asset_balance(&asset.clone()).unwrap();
         let balance = res.get(&asset.clone()).unwrap();
-        let rv = ExchangeBalance::new(
-            asset.clone(),
-            (*balance).try_into().unwrap(),
-            0.0
-        );
+        let rv = ExchangeBalance::new(asset.clone(), (*balance).try_into().unwrap(), 0.0);
 
         Some(rv)
     }
@@ -196,11 +195,7 @@ where
         let mut rv_map: HashMap<String, ExchangeBalance> = HashMap::new();
 
         for (key, val) in self.api.get_account_balance().unwrap().iter() {
-            let balance = ExchangeBalance::new(
-                key.clone(),
-                (*val).try_into().unwrap(),
-                0.0
-            );
+            let balance = ExchangeBalance::new(key.clone(), (*val).try_into().unwrap(), 0.0);
             rv_map.insert(key.clone(), balance);
         }
 

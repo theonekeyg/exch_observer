@@ -4,6 +4,7 @@
  **/
 use libflate::gzip::Decoder;
 
+use log::{error, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -12,14 +13,10 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use tungstenite::{
-    connect, handshake::client::Response, protocol::WebSocket,
-    stream::MaybeTlsStream, Message,
+    connect, handshake::client::Response, protocol::WebSocket, stream::MaybeTlsStream, Message,
 };
-use log::{error, warn};
 
-use crate::common::{
-    KLine, BookTick, WebsocketEvent, WebSocketError, Result as WsResult,
-};
+use crate::common::{BookTick, KLine, Result as WsResult, WebSocketError, WebsocketEvent};
 
 /// Internal Huobi KLine ABI
 #[derive(Serialize, Deserialize, Debug)]
@@ -223,11 +220,14 @@ impl<'a> HuobiWebsocket<'a> {
     /// documented way of subscribing to a stream.
     fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
         if let Some(ref mut socket) = self.socket {
-            socket.0.write_message(Message::Text(format!(
-                "{{\"sub\": \"{}\", \"id\": \"id{}\"}}",
-                subscription,
-                HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed)
-            ))).map_err(|e| WebSocketError::WriteError(e.to_string()))?;
+            socket
+                .0
+                .write_message(Message::Text(format!(
+                    "{{\"sub\": \"{}\", \"id\": \"id{}\"}}",
+                    subscription,
+                    HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed)
+                )))
+                .map_err(|e| WebSocketError::WriteError(e.to_string()))?;
         }
 
         Ok(())
@@ -245,9 +245,10 @@ impl<'a> HuobiWebsocket<'a> {
         // Only start the connection if running flag is true
         while running.load(Ordering::Relaxed) {
             if let Some(ref mut socket) = self.socket {
-                let msg = socket.0.read_message().map_err(|e| {
-                    WebSocketError::ReadError(e.to_string())
-                })?;
+                let msg = socket
+                    .0
+                    .read_message()
+                    .map_err(|e| WebSocketError::ReadError(e.to_string()))?;
                 match msg {
                     Message::Binary(bin) => {
                         // Huobi WebSocket API only sends messages in binary encrypted gzip format,
@@ -271,10 +272,13 @@ impl<'a> HuobiWebsocket<'a> {
                             }
                             HuobiWebsocketEvent::PingEvent(event) => {
                                 // debug!("Received ping event: {}", event.ping);
-                                socket.0.write_message(Message::Text(format!(
-                                    "{{\"pong\":{}}}",
-                                    event.ping
-                                ))).map_err(|e| WebSocketError::WriteError(e.to_string()))?;
+                                socket
+                                    .0
+                                    .write_message(Message::Text(format!(
+                                        "{{\"pong\":{}}}",
+                                        event.ping
+                                    )))
+                                    .map_err(|e| WebSocketError::WriteError(e.to_string()))?;
                                 continue;
                             }
                             HuobiWebsocketEvent::StatusEvent(_event) => {

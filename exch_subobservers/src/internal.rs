@@ -1,10 +1,10 @@
+use exch_observer_types::PairedExchangeSymbol;
 use std::{
     collections::HashMap,
+    hash::Hash,
     sync::atomic::{AtomicBool, Ordering},
-    hash::Hash
 };
 use tokio::task::JoinHandle;
-use exch_observer_types::PairedExchangeSymbol;
 
 /// Internal data structure for the observer worker threads.
 /// Used to implement voting mechanism for symbols to stop their threads,

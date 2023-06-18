@@ -75,9 +75,11 @@ impl ExchCli {
         let mut client = runtime.block_on(ObserverRpcClient::new(rpc_config));
 
         debug!("Fetching price");
-        let (price, timestamp) = runtime.block_on(client.get_price_with_timestamp(&network, &base, &quote));
+        let (price, timestamp) =
+            runtime.block_on(client.get_price_with_timestamp(&network, &base, &quote));
         println!(
-            "price: {} was {} seconds ago", price,
+            "price: {} was {} seconds ago",
+            price,
             get_current_timestamp().unwrap() - timestamp
         );
     }

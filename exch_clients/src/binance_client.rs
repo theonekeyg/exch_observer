@@ -1,22 +1,22 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    hash::Hash,
-    sync::Arc,
-    marker::PhantomData,
-    iter::Iterator,
-    convert::From
-};
-use log::info;
-use tokio::runtime::Runtime;
 use binance::{
     account::{Account, OrderSide, OrderType, TimeInForce},
-    model::Symbol as BSymbol,
     api::Binance,
+    general::General,
     market::Market,
-    general::General
+    model::Symbol as BSymbol,
 };
 use exch_observer_types::{ExchangeBalance, ExchangeClient};
+use log::info;
+use std::{
+    collections::HashMap,
+    convert::From,
+    fmt::{Debug, Display},
+    hash::Hash,
+    iter::Iterator,
+    marker::PhantomData,
+    sync::Arc,
+};
+use tokio::runtime::Runtime;
 
 /// Client for the Binance REST API, implemented using
 /// `https://github.com/wisespace-io/binance-rs.git` crate
@@ -32,7 +32,8 @@ pub struct BinanceClient<Symbol: Eq + Hash + From<BSymbol>> {
 }
 
 impl<Symbol> BinanceClient<Symbol>
-where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<BSymbol>
+where
+    Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<BSymbol>,
 {
     pub fn new(api_key: Option<String>, secret_key: Option<String>) -> Self {
         Self {
@@ -137,8 +138,7 @@ where Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<BSymbol>
                 let symbol: Symbol = From::<BSymbol>::from(s.clone());
                 symbol
             })
-            .collect()
-        )
+            .collect())
     }
 }
 

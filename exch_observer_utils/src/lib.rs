@@ -1,6 +1,4 @@
-use std::{
-    time::{UNIX_EPOCH, SystemTimeError}
-};
+use std::time::{SystemTimeError, UNIX_EPOCH};
 
 /// Returns current system time as a UNIX timestamp
 /// or error if there are issues with system clock.

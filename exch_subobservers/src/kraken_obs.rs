@@ -1,10 +1,11 @@
+use crate::internal::{kraken_symbol, ObserverWorkerThreadData};
 use exch_apis::{
-    kraken_ws::KrakenWebsocket,
     common::{Result as WsResult, WebsocketEvent},
+    kraken_ws::KrakenWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder
+    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
+    SwapOrder,
 };
 use log::{debug, info, trace};
 use std::{
@@ -15,7 +16,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
-use crate::internal::{ObserverWorkerThreadData, kraken_symbol};
 
 pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
 
@@ -42,7 +42,10 @@ where
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<ObserverWorkerThreadData<Symbol>>>,
-    running_handles: Vec<(JoinHandle<WsResult<()>>, Arc<ObserverWorkerThreadData<Symbol>>)>,
+    running_handles: Vec<(
+        JoinHandle<WsResult<()>>,
+        Arc<ObserverWorkerThreadData<Symbol>>,
+    )>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -88,41 +91,43 @@ where
         let ws_query_subs = symbols
             .iter()
             .map(|sym| {
-                format!("{}/{}", sym.base().to_uppercase(), sym.quote().to_uppercase())
+                format!(
+                    "{}/{}",
+                    sym.base().to_uppercase(),
+                    sym.quote().to_uppercase()
+                )
             })
             .collect::<Vec<_>>();
         runner.spawn_blocking(move || {
-            let mut websock = KrakenWebsocket::new(
-                move |event: WebsocketEvent| -> WsResult<()> {
-                    match event {
-                        WebsocketEvent::KLineEvent(kline) => {
-                            let price_high = kline.high;
-                            let price_low = kline.low;
-                            let price = (price_high + price_low) / 2.0;
-                            let sym_index = kline.sym.clone();
-                            let update_value = price_table.get(&sym_index).unwrap();
-                            update_value
-                                .lock()
-                                .unwrap()
-                                .update_price((price_high, price_low));
-                            trace!("[{}] Price: {:?}", sym_index, price);
-                        }
-                        WebsocketEvent::BookTickerEvent(book) => {
-                            let ask_price = book.best_ask;
-                            let bid_price = book.best_bid;
-                            let sym_index = book.sym.clone();
-                            let update_value = price_table.get(&sym_index).unwrap();
-                            update_value
-                                .lock()
-                                .unwrap()
-                                .update_price((ask_price, bid_price));
-                            trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
-                        }
+            let mut websock = KrakenWebsocket::new(move |event: WebsocketEvent| -> WsResult<()> {
+                match event {
+                    WebsocketEvent::KLineEvent(kline) => {
+                        let price_high = kline.high;
+                        let price_low = kline.low;
+                        let price = (price_high + price_low) / 2.0;
+                        let sym_index = kline.sym.clone();
+                        let update_value = price_table.get(&sym_index).unwrap();
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((price_high, price_low));
+                        trace!("[{}] Price: {:?}", sym_index, price);
                     }
+                    WebsocketEvent::BookTickerEvent(book) => {
+                        let ask_price = book.best_ask;
+                        let bid_price = book.best_bid;
+                        let sym_index = book.sym.clone();
+                        let update_value = price_table.get(&sym_index).unwrap();
+                        update_value
+                            .lock()
+                            .unwrap()
+                            .update_price((ask_price, bid_price));
+                        trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+                    }
+                }
 
-                    WsResult::Ok(())
-                },
-            );
+                WsResult::Ok(())
+            });
             websock.connect_multiple_streams(ws_query_subs)?;
             websock.event_loop(&thread_data.is_running)
         })
@@ -184,9 +189,7 @@ where
             self.symbols_in_queue.push(symbol.clone());
 
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
-                let thread_data = Arc::new(ObserverWorkerThreadData::from(
-                    &self.symbols_in_queue,
-                ));
+                let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
 
                 let handle = Self::launch_worker_multiple(
                     self.async_runner.deref(),
@@ -244,9 +247,7 @@ where
         info!("Starting Kraken Observer");
 
         if self.symbols_in_queue.len() > 0 {
-            let thread_data = Arc::new(ObserverWorkerThreadData::from(
-                &self.symbols_in_queue,
-            ));
+            let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
 
             for sym in &self.symbols_in_queue {
                 self.threads_data_mapping
@@ -305,10 +306,7 @@ where
             // won't have to deal with locks in this communication between threads. As long as
             // only AtomicBool in this structure is used in subthreads, this is thread-safe.
             unsafe {
-                let mut data = self
-                    .threads_data_mapping
-                    .get_mut(&symbol)
-                    .unwrap();
+                let mut data = self.threads_data_mapping.get_mut(&symbol).unwrap();
 
                 let mut data = Arc::get_mut_unchecked(&mut data);
 

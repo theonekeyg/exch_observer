@@ -1,28 +1,24 @@
+use serde::{Deserialize, Serialize};
 /**
  * `kraken_ws.rs` file containts functions and structs useful
  * to connect to kraken Websocket API.
  **/
-
 use std::{
+    cmp::PartialEq,
     net::TcpStream,
     sync::atomic::{AtomicBool, Ordering},
-    cmp::PartialEq
 };
 use tungstenite::{
-    connect, handshake::client::Response, protocol::WebSocket,
-    stream::MaybeTlsStream, Message,
+    connect, handshake::client::Response, protocol::WebSocket, stream::MaybeTlsStream, Message,
 };
-use serde::{Deserialize, Serialize};
 
-use crate::common::{
-    KLine, BookTick, WebsocketEvent, WebSocketError, Result as WsResult
-};
+use crate::common::{BookTick, KLine, Result as WsResult, WebSocketError, WebsocketEvent};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct KrakenAskBidData {
     price: String,
     whole_lot_volume: i64,
-    lot_volume: String
+    lot_volume: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -201,7 +197,7 @@ enum KrakenWebsocketEvent {
     BookTickerEvent(KrakenBookTickerEvent),
     SubscriptionStatusEvent(KrakenSubscriptionStatusEvent),
     OHLCEvent(KrakenOHLCEvent),
-    HeartbeatEvent(KrakenHeartbeatEvent)
+    HeartbeatEvent(KrakenHeartbeatEvent),
 }
 
 /// Kraken base URL for websocket API
@@ -213,7 +209,6 @@ pub struct KrakenWebsocket<'a> {
 }
 
 impl<'a> KrakenWebsocket<'a> {
-
     /// Creates new KrakenWebsocket with provided function to handle events
     pub fn new<Callback>(handler: Callback) -> Self
     where
@@ -225,10 +220,7 @@ impl<'a> KrakenWebsocket<'a> {
         }
     }
 
-    pub fn connect_multiple_streams(
-        &mut self,
-        subscriptions: Vec<String>
-    ) -> WsResult<()> {
+    pub fn connect_multiple_streams(&mut self, subscriptions: Vec<String>) -> WsResult<()> {
         if self.socket.is_none() {
             self.socket = Some(self.create_connection(KRAKEN_WS_URL)?);
         }
@@ -240,13 +232,19 @@ impl<'a> KrakenWebsocket<'a> {
     #[allow(dead_code)]
     fn connect_ws(&mut self, subscription: &str) -> WsResult<()> {
         if let Some(ref mut socket) = self.socket {
-            socket.0.write_message(Message::Text(format!("{{
+            socket
+                .0
+                .write_message(Message::Text(format!(
+                    "{{
                 \"event\":\"subscribe\",
                 \"pair\":[\"{}\"],
                 \"subscription\":{{
                     \"name\":\"spread\"
                 }}
-            }}", subscription))).map_err(|e| WebSocketError::WriteError(e.to_string()))?;
+            }}",
+                    subscription
+                )))
+                .map_err(|e| WebSocketError::WriteError(e.to_string()))?;
         }
 
         Ok(())
@@ -254,13 +252,19 @@ impl<'a> KrakenWebsocket<'a> {
 
     fn connect_multiple_ws(&mut self, subscriptions: Vec<String>) -> WsResult<()> {
         if let Some(ref mut socket) = self.socket {
-            socket.0.write_message(Message::Text(String::from(format!("{{
+            socket
+                .0
+                .write_message(Message::Text(String::from(format!(
+                    "{{
                 \"event\": \"subscribe\",
                 \"pair\": {},
                 \"subscription\": {{
                     \"name\": \"spread\"
                 }}
-            }}", serde_json::to_string(&subscriptions).unwrap())))).unwrap();
+            }}",
+                    serde_json::to_string(&subscriptions).unwrap()
+                ))))
+                .unwrap();
         }
 
         Ok(())
@@ -278,9 +282,10 @@ impl<'a> KrakenWebsocket<'a> {
         // Only start the connection if running flag is true
         while running.load(Ordering::Relaxed) {
             if let Some(ref mut socket) = self.socket {
-                let msg = socket.0.read_message().map_err(|e| {
-                    WebSocketError::ReadError(e.to_string())
-                })?;
+                let msg = socket
+                    .0
+                    .read_message()
+                    .map_err(|e| WebSocketError::ReadError(e.to_string()))?;
                 match msg {
                     Message::Text(text) => {
                         let event: KrakenWebsocketEvent = serde_json::from_str(&text).unwrap();
@@ -288,14 +293,14 @@ impl<'a> KrakenWebsocket<'a> {
                         let ws_event = match event {
                             KrakenWebsocketEvent::BookTickerEvent(e) => {
                                 Some(WebsocketEvent::BookTickerEvent(e.into()))
-                            },
+                            }
                             KrakenWebsocketEvent::OHLCEvent(e) => {
                                 Some(WebsocketEvent::KLineEvent(e.into()))
-                            },
+                            }
                             KrakenWebsocketEvent::SpreadEvent(e) => {
                                 Some(WebsocketEvent::BookTickerEvent(e.into()))
-                            },
-                            _ => None // Ignore other events
+                            }
+                            _ => None, // Ignore other events
                         };
 
                         if let Some(ws_event) = ws_event {
@@ -321,11 +326,22 @@ fn test_book_ticker_event_deserialization_from_json() {
     let expected = KrakenWebsocketEvent::BookTickerEvent(KrakenBookTickerEvent {
         channel_id: 340,
         data: KrakenBookTickData {
-            ask: KrakenAskBidData { price: "26870.00000".to_string(), whole_lot_volume: 0, lot_volume: "0.95697355".to_string() },
-            bid: KrakenAskBidData { price: "26869.90000".to_string(), whole_lot_volume: 1, lot_volume: "1.18808196".to_string() },
+            ask: KrakenAskBidData {
+                price: "26870.00000".to_string(),
+                whole_lot_volume: 0,
+                lot_volume: "0.95697355".to_string(),
+            },
+            bid: KrakenAskBidData {
+                price: "26869.90000".to_string(),
+                whole_lot_volume: 1,
+                lot_volume: "1.18808196".to_string(),
+            },
             close: vec!["26869.90000".to_string(), "0.00185950".to_string()],
             volume: vec!["69.72579216".to_string(), "2050.18198936".to_string()],
-            volume_weighted_average_price: vec!["26879.26763".to_string(), "26901.26063".to_string()],
+            volume_weighted_average_price: vec![
+                "26879.26763".to_string(),
+                "26901.26063".to_string(),
+            ],
             number_of_trades: vec![2462, 27770],
             low: vec!["26834.20000".to_string(), "26635.30000".to_string()],
             high: vec!["26918.90000".to_string(), "27174.80000".to_string()],
@@ -420,7 +436,7 @@ fn test_subscription_status_from_json() {
         event: "subscriptionStatus".to_string(),
         pair: "ETH/USD".to_string(),
         status: "subscribed".to_string(),
-        subscription: KrakenSubscription::with_name("ticker".to_string())
+        subscription: KrakenSubscription::with_name("ticker".to_string()),
     });
 
     assert_eq!(event, expected);
