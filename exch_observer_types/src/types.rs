@@ -115,6 +115,7 @@ impl Eq for ExchangeSymbol {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ArbitrageExchangeSymbol {
     /// Base and Quote tokens
+    #[serde(flatten)]
     pub inner: ExchangeSymbol,
     /// Pair name (e.g. `ethbtc` on Binance, `XXBTZUSD` on Kraken)
     /// mostly used to correct Websocket connections
