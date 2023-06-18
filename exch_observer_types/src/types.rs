@@ -32,7 +32,7 @@ pub trait PairedExchangeSymbol {
 /// Very basic symbol structure, used in the observer RPC server.
 /// For more complicated applications (such as trading bots or information-gathering tools)
 /// using more complex structure might be more convenient.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExchangeSymbol {
     pub base: String,
     pub quote: String,
@@ -112,7 +112,7 @@ impl Eq for ExchangeSymbol {}
 
 /// Generic symbol on the exchange. Meant to have everything that
 /// any exchange would have.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ArbitrageExchangeSymbol {
     /// Base and Quote tokens
     pub inner: ExchangeSymbol,
