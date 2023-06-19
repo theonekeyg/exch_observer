@@ -136,24 +136,30 @@ where
         };
 
         // Create observers based on the provided config
-        if let Some(_) = &self.config.binance {
-            let binance_client = self.clients.binance_client.clone();
+        if let Some(conf) = &self.config.binance {
+            if conf.enable {
+                let binance_client = self.clients.binance_client.clone();
 
-            let binance_observer = BinanceObserver::new(binance_client, runtime.clone());
-            self.observers
-                .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
+                let binance_observer = BinanceObserver::new(binance_client, runtime.clone());
+                self.observers
+                    .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
+            }
         }
 
-        if let Some(_) = &self.config.huobi {
-            let huobi_observer = HuobiObserver::new(runtime.clone());
-            self.observers
-                .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
+        if let Some(conf) = &self.config.huobi {
+            if conf.enable {
+                let huobi_observer = HuobiObserver::new(runtime.clone());
+                self.observers
+                    .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
+            }
         }
 
-        if let Some(_) = &self.config.kraken {
-            let kraken_observer = KrakenObserver::new(runtime.clone());
-            self.observers
-                .insert(ExchangeObserverKind::Kraken, Box::new(kraken_observer));
+        if let Some(conf) = &self.config.kraken {
+            if conf.enable {
+                let kraken_observer = KrakenObserver::new(runtime.clone());
+                self.observers
+                    .insert(ExchangeObserverKind::Kraken, Box::new(kraken_observer));
+            }
         }
 
         Ok(())
