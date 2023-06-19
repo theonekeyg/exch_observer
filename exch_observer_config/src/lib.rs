@@ -7,6 +7,7 @@ use serde::Deserialize;
 pub struct KrakenConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
 }
@@ -16,6 +17,7 @@ pub struct KrakenConfig {
 pub struct BinanceConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
 }
@@ -25,6 +27,7 @@ pub struct BinanceConfig {
 pub struct HuobiConfig {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
 }
