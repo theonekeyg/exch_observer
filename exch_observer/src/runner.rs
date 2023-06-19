@@ -49,8 +49,8 @@ impl ObserverRunner {
             let mut observer = self.main_observer.write().unwrap();
             observer.create_observers().unwrap();
             observer.load_symbols(|record| {
-                let base_sym = record.get(1).unwrap();
-                let quote_sym = record.get(2).unwrap();
+                let base_sym = record.get(0).unwrap();
+                let quote_sym = record.get(1).unwrap();
                 Some(ExchangeSymbol::from(base_sym, quote_sym))
             });
             observer.launch().unwrap();
