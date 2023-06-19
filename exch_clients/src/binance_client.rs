@@ -129,10 +129,13 @@ where
         });
     }
 
-    /// Fetches symbols from the exchange
-    fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+    fn fetch_symbols_unfiltered(&self) -> Result<Vec<BSymbol>, Box<dyn std::error::Error>> {
         let symbols = self.general.exchange_info()?.symbols;
-        Ok(symbols
+        Ok(symbols)
+    }
+
+    fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        Ok(self.fetch_symbols_unfiltered()?
             .iter()
             .map(|s| {
                 let symbol: Symbol = From::<BSymbol>::from(s.clone());
@@ -200,5 +203,17 @@ where
 
     fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         self.fetch_and_convert_symbols()
+    }
+
+    /// Fetches online symbols from the exchange and returns list of symbols
+    fn fetch_online_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        Ok(self.fetch_symbols_unfiltered()?
+            .iter()
+            .filter(|s| s.status == "TRADING")
+            .map(|s| {
+                let symbol: Symbol = From::<BSymbol>::from(s.clone());
+                symbol
+            })
+            .collect())
     }
 }

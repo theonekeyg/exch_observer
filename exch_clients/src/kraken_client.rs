@@ -135,12 +135,15 @@ where
         });
     }
 
+    /// Fetches symbols from the exchange, performs no filtration of modification of symbols
+    fn fetch_symbols_unfiltered(&self) -> Result<HashMap<String, AssetPair>, Box<dyn std::error::Error>> {
+        let symbols = self.api.asset_pairs(vec![]).unwrap();
+        Ok(symbols)
+    }
+
     /// Fetches symbols from the exchange
     fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
-        let symbols = self.api.asset_pairs(vec![]).unwrap();
-        // TODO: Rewrite this function to return Iterator instead of Vec.
-        // This function doesn't need to return collected Vec,
-        // instead returning the iterator would be far more better solution.
+        let symbols = self.fetch_symbols_unfiltered()?;
         Ok(symbols
             .iter()
             .map(|(_, v)| {
@@ -204,5 +207,17 @@ where
 
     fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         self.fetch_and_convert_symbols()
+    }
+
+    /// Fetches online symbols from the exchange and returns list of symbols
+    fn fetch_online_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+        Ok(self.fetch_symbols_unfiltered()?
+            .iter()
+            .filter(|(_, v)| v.status == "online")
+            .map(|(_, v)| {
+                let symbol: Symbol = From::<AssetPair>::from(v.clone());
+                symbol
+            })
+            .collect())
     }
 }

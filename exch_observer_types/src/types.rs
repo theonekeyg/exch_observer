@@ -643,6 +643,9 @@ pub trait ExchangeClient<Symbol: Eq + Hash> {
 
     /// Fetches all symbols from the exchange and returns list of symbols
     fn fetch_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>>;
+
+    /// Fetches online symbols from the exchange and returns list of symbols
+    fn fetch_online_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>>;
 }
 
 impl Into<ExchangeBalance> for BinanceBalance {
