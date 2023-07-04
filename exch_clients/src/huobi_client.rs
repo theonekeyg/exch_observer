@@ -1,6 +1,7 @@
 use chrono::Utc;
 use exch_observer_types::{
-    ArbitrageExchangeSymbol, ExchangeBalance, ExchangeClient, ExchangeSymbol, HuobiSymbol,
+    ArbitrageExchangeSymbol, ExchangeBalance, ExchangeClient, ExchangeSymbol,
+    exchanges::huobi::HuobiSymbol
 };
 use hmac::{Hmac, Mac};
 use reqwest::{Body, Request, RequestBuilder};
