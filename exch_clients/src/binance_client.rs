@@ -135,7 +135,8 @@ where
     }
 
     fn fetch_and_convert_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
-        Ok(self.fetch_symbols_unfiltered()?
+        Ok(self
+            .fetch_symbols_unfiltered()?
             .iter()
             .map(|s| {
                 let symbol: Symbol = From::<BSymbol>::from(s.clone());
@@ -207,7 +208,8 @@ where
 
     /// Fetches online symbols from the exchange and returns list of symbols
     fn fetch_online_symbols(&self) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
-        Ok(self.fetch_symbols_unfiltered()?
+        Ok(self
+            .fetch_symbols_unfiltered()?
             .iter()
             .filter(|s| s.status == "TRADING")
             .map(|s| {
