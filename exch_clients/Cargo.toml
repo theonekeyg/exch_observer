@@ -7,8 +7,13 @@ edition = "2021"
 
 [dependencies]
 binance = { workspace = true }
-krakenrs = { workspace = true }
-tokio = { workspace = true }
-log = { workspace = true }
+chrono = { workspace = true }
 exch_observer_config = { workspace = true }
 exch_observer_types = { workspace = true }
+hmac = { workspace = true }
+krakenrs = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
