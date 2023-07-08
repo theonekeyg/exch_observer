@@ -106,3 +106,23 @@ impl From<HuobiSymbol> for ArbitrageExchangeSymbol {
     }
 }
 
+/// Respose for `/v1/account/accounts` API
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct HuobiAccount {
+    /// Unique account id
+    pub id: u64,
+    /// Account state
+    #[serde(rename = "type")]
+    pub type_field: String,
+    /// The type of this account
+    pub subtype: String,
+    /// The type of sub account (applicable only for isolated margin accout)
+    pub state: String
+}
+
+/// Respose for `/v1/account/accounts` API
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct HuobiAccountsResponse {
+    pub status: String,
+    pub data: Vec<HuobiAccount>,
+}
