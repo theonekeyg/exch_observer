@@ -30,7 +30,7 @@ pub struct HuobiClient<Symbol: Eq + Hash + From<HuobiSymbol>> {
     pub api_key: String,
     /// Huobi Secret KEY
     pub secret_key: String,
-    client: ReqwestClient,
+    pub client: ReqwestClient,
     marker: PhantomData<Symbol>,
 }
 
@@ -57,8 +57,6 @@ where
 
         // Concatenate method, host, path and query into single stirng
         let body = format!("{}\n{}\n{}\n{}", method, host, path, query);
-
-        println!("body: `{:?}`", body);
 
         mac.update(body.as_ref());
         base64::encode(mac.finalize().into_bytes())
@@ -132,7 +130,9 @@ where
 
     /// Fetches balances for the current user whose api key is used
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
-        Ok(HashMap::new())
+        let mut balances = HashMap::new();
+
+        Ok(balances)
     }
 
     /// Fetches all symbols from the exchange and returns list of symbols
@@ -163,16 +163,25 @@ mod test {
     const API_KEY: &str = "26a15081-qz5c4v5b6n-e24b3e6c-06545";
     const SECRET_KEY: &str = "a4ec0775-2845fec2-640a8a28-b3fa6";
 
-    // #[test]
-    // fn test_signature() {
-    //     let client =
-    //         HuobiClient::<ExchangeSymbol>::new(API_KEY.to_string(), SECRET_KEY.to_string());
-    //     let request = client.get_signature(b"Hello world");
-    //     assert_eq!(
-    //         request,
-    //         "03ad9ec9882cadd851ce13d1af19df3da4f4133dd41ddf8ceddd77ccf6148cd6"
-    //     );
-    // }
+    #[test]
+    fn test_signature() {
+        let client =
+            HuobiClient::<ExchangeSymbol>::new(API_KEY.to_string(), SECRET_KEY.to_string());
+        let req = client.client.get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
+            .query(&[
+                ("AccessKeyId", API_KEY),
+                ("SignatureMethod", "HmacSHA256"),
+                ("SignatureVersion", "2"),
+                ("Timestamp", "2023-06-11T15:19:30"),
+            ])
+            .build().expect("Failed to build request");
+
+        let request = client.get_signature(&req);
+        assert_eq!(
+            request,
+            "MuR/t0iLoXEwHLyOoBgX1/dL/BE3wuhO4xVngjkM7vM="
+        );
+    }
 
     #[test]
     fn test_fetch_symbols() {
