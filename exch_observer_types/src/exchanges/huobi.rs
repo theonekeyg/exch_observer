@@ -2,7 +2,8 @@ use std::{
     hash::Hash,
 };
 use crate::types::{
-    ExchangeSymbol, ArbitrageExchangeSymbol
+    ExchangeSymbol, ArbitrageExchangeSymbol, ExchangeAccount,
+    ExchangeAccountState, ExchangeAccountType
 };
 use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
@@ -111,13 +112,37 @@ impl From<HuobiSymbol> for ArbitrageExchangeSymbol {
 pub struct HuobiAccount {
     /// Unique account id
     pub id: u64,
-    /// Account state
+    /// The type of this account
     #[serde(rename = "type")]
     pub type_field: String,
-    /// The type of this account
-    pub subtype: String,
     /// The type of sub account (applicable only for isolated margin accout)
+    pub subtype: String,
+    /// Account state
     pub state: String
+}
+
+impl Into<ExchangeAccount> for &HuobiAccount {
+    fn into(self) -> ExchangeAccount {
+        let account_type = match self.type_field.as_str() {
+            "spot" => ExchangeAccountType::Spot,
+            "margin" => ExchangeAccountType::Margin,
+            "otc" => ExchangeAccountType::Otc,
+            "point" => ExchangeAccountType::Point,
+            _ => ExchangeAccountType::Unknown,
+        };
+
+        let account_state = match self.state.as_str() {
+            "working" => ExchangeAccountState::Working,
+            "lock" => ExchangeAccountState::Locked,
+            _ => ExchangeAccountState::Unknown,
+        };
+
+        ExchangeAccount {
+            id: self.id.to_string(),
+            account_type,
+            state: account_state,
+        }
+    }
 }
 
 /// Respose for `/v1/account/accounts` API
@@ -125,4 +150,15 @@ pub struct HuobiAccount {
 pub struct HuobiAccountsResponse {
     pub status: String,
     pub data: Vec<HuobiAccount>,
+}
+
+// #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+// pub struct HuobiAccountBalance {
+// }
+
+/// Respose for `/v1/account/accounts/{account-id}/balance` API
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct HuobiAccountBalanceResponse {
+    pub status: String,
+    pub data: HuobiAccountBalance,
 }

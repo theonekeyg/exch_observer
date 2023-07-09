@@ -605,12 +605,45 @@ impl FromStr for ExchangeObserverKind {
     }
 }
 
+/// Enum to represent an account state on the exchange
+#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub enum ExchangeAccountState {
+    Working,
+    Locked,
+    Unknown,
+}
+
+/// Enum to represent an account type on the exchange
+#[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub enum ExchangeAccountType {
+    Spot,
+    Margin,
+    Otc,
+    Point,
+    Unknown,
+}
+
+/// Structure to represent each account on the exchange,
+/// useful when exchange has multiple accounts
+#[derive(Debug, Hash, PartialEq, Serialize, Deserialize, Clone)]
+pub struct ExchangeAccount {
+    /// External id of the account (if exchange doesn't use ids, this can be empty)
+    pub id: String,
+    /// Type of the account
+    pub account_type: ExchangeAccountType,
+    /// State of the account
+    pub state: ExchangeAccountState,
+}
+
 /// Structure to represent balance on the exchange.
 /// Not used in observer, but often used in exchange clients.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExchangeBalance {
+    /// Asset string
     pub asset: String,
+    /// Free amount of the asset
     pub free: f64,
+    /// Locked amount of the asset
     pub locked: f64,
 }
 

@@ -1,6 +1,7 @@
 use chrono::Utc;
 use exch_observer_types::{
     ArbitrageExchangeSymbol, ExchangeBalance, ExchangeClient, ExchangeSymbol,
+    ExchangeAccount, ExchangeAccountType,
     exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse}
 };
 use hmac::{Hmac, Mac};
@@ -62,7 +63,7 @@ where
         base64::encode(mac.finalize().into_bytes())
     }
 
-    fn accounts(&self) -> Result<HuobiAccountsResponse, Box<dyn std::error::Error>> {
+    fn accounts(&self) -> Result<HashMap<ExchangeAccountType, ExchangeAccount>, Box<dyn std::error::Error>> {
 
         let mut req = self.client.get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
             .query(&[
@@ -79,12 +80,20 @@ where
         // Add signature to the request query
         req.url_mut().query_pairs_mut().append_pair("Signature", signature.as_str());
 
+        // Send request and get response body
         let res_body = self.client.execute(req)?.text()?;
 
-        println!("res_body: {:?}", res_body);
+        // Parse response body into HashMap<ExchangeAccountType, ExchangeAccount>
+        let res = serde_json::from_str::<HuobiAccountsResponse>(&res_body)?
+            .data
+            .iter()
+            .map(|a| {
+                let r = Into::<ExchangeAccount>::into(a);
+                (r.account_type.clone(), r)
+            })
+            .collect::<HashMap<ExchangeAccountType, ExchangeAccount>>();
 
-        Ok(serde_json::from_str::<HuobiAccountsResponse>(&res_body)?)
-        // Err("Temp error".into())
+        Ok(res)
     }
 
     fn fetch_symbols_unfiltered(&self) -> Result<Vec<HuobiSymbol>, Box<dyn std::error::Error>> {
@@ -131,6 +140,9 @@ where
     /// Fetches balances for the current user whose api key is used
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
         let mut balances = HashMap::new();
+
+        let accounts = self.accounts()?;
+        let spot_account = accounts.get(&ExchangeAccountType::Spot)?;
 
         Ok(balances)
     }
