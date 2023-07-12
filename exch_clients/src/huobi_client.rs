@@ -2,7 +2,7 @@ use chrono::Utc;
 use exch_observer_types::{
     ArbitrageExchangeSymbol, ExchangeBalance, ExchangeClient, ExchangeSymbol,
     ExchangeAccount, ExchangeAccountType,
-    exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse}
+    exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse, HuobiAccountBalanceResponse}
 };
 use hmac::{Hmac, Mac};
 use reqwest::{
@@ -96,6 +96,58 @@ where
         Ok(res)
     }
 
+    fn get_account_balance(&self, account_id: String)
+        -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
+        let mut req = self.client.get(format!("{}/v1/account/accounts/{}/balance", HUOBI_API_URL, account_id).as_str())
+            .query(&[
+                ("AccessKeyId", self.api_key.as_str()),
+                ("SignatureMethod", "HmacSHA256"),
+                ("SignatureVersion", "2"),
+                ("Timestamp", Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str()),
+            ])
+            .build()?;
+
+        // Generate request signature
+        let signature = self.get_signature(&req);
+
+        // Add signature to the request query
+        req.url_mut().query_pairs_mut().append_pair("Signature", signature.as_str());
+
+        // Send request and get response body
+        let res_body = self.client.execute(req)?.text()?;
+
+        // Parse response body
+        let res = serde_json::from_str::<HuobiAccountBalanceResponse>(&res_body)
+            .expect("Failed to parse account balance response");
+
+        let mut rv: HashMap<String, ExchangeBalance> = HashMap::new();
+
+        for currency in res.data.list {
+            let balance = currency.balance.parse::<f64>()
+                .expect("Failed to parse account balance");
+
+            if balance > 0.0 {
+                match currency.type_field.as_str() {
+                    "trade" => {
+                        if let Some(mut balance_data) = rv.get_mut(currency.currency.as_str()) {
+                            balance_data.free = balance_data.free + balance;
+                        } else {
+                            let asset = currency.currency.clone();
+                            rv.insert(currency.currency, ExchangeBalance {
+                                asset: asset,
+                                free: balance,
+                                locked: 0.0,
+                            });
+                        }
+                    },
+                    _ => unimplemented!(),
+                }
+            }
+        }
+
+        Ok(rv)
+    }
+
     fn fetch_symbols_unfiltered(&self) -> Result<Vec<HuobiSymbol>, Box<dyn std::error::Error>> {
         let res_body =
             reqwest::blocking::get(format!("{}/v1/common/symbols", HUOBI_API_URL).as_str())?
@@ -139,10 +191,15 @@ where
 
     /// Fetches balances for the current user whose api key is used
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
-        let mut balances = HashMap::new();
 
+        // Fetch accounts 
         let accounts = self.accounts()?;
-        let spot_account = accounts.get(&ExchangeAccountType::Spot)?;
+        // Get spot account
+        let spot_account = accounts.get(&ExchangeAccountType::Spot)
+            .expect("Failed to get spot account");
+        // Parse balances from spot account
+        let balances = self.get_account_balance(spot_account.id.clone())
+            .expect("Failed to construct balances");
 
         Ok(balances)
     }
@@ -195,13 +252,24 @@ mod test {
         );
     }
 
+    // #[test]
+    // fn test_fetch_symbols() {
+    //     let client = HuobiClient::<ArbitrageExchangeSymbol>::new(
+    //         API_KEY.to_string(),
+    //         SECRET_KEY.to_string(),
+    //     );
+    //     let accounts = client.accounts().unwrap();
+    //     panic!("Accounts: {:?}", accounts);
+    // }
+
     #[test]
-    fn test_fetch_symbols() {
+    fn test_account_balance() {
         let client = HuobiClient::<ArbitrageExchangeSymbol>::new(
             API_KEY.to_string(),
             SECRET_KEY.to_string(),
         );
-        let accounts = client.accounts().unwrap();
+
+        let accounts = client.get_balances().unwrap();
         panic!("Accounts: {:?}", accounts);
     }
 }

@@ -3,7 +3,7 @@ use std::{
 };
 use crate::types::{
     ExchangeSymbol, ArbitrageExchangeSymbol, ExchangeAccount,
-    ExchangeAccountState, ExchangeAccountType
+    ExchangeAccountState, ExchangeAccountType, ExchangeBalance
 };
 use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
@@ -152,13 +152,28 @@ pub struct HuobiAccountsResponse {
     pub data: Vec<HuobiAccount>,
 }
 
-// #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-// pub struct HuobiAccountBalance {
-// }
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct HuobiAccountBalance {
+    pub currency: String,
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub balance: String,
+    #[serde(rename = "seq-num")]
+    pub seq_num: String,
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct HuobiAccountBalanceData {
+    pub id: u64,
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub state: String,
+    pub list: Vec<HuobiAccountBalance>,
+}
 
 /// Respose for `/v1/account/accounts/{account-id}/balance` API
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct HuobiAccountBalanceResponse {
-    pub status: String,
-    pub data: HuobiAccountBalance,
+    pub status : String,
+    pub data: HuobiAccountBalanceData,
 }
