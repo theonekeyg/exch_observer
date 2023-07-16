@@ -19,7 +19,7 @@ use tokio::runtime::Builder as RuntimeBuilder;
 
 use crate::{
     scanner::SymbolScanner,
-    symbols_parser::{BinanceSymbolsParser, KrakenSymbolsParser, HuobiSymbolsParser},
+    symbols_parser::{BinanceSymbolsParser, HuobiSymbolsParser, KrakenSymbolsParser},
     types::{ArbitrageExchangeSymbolRow, SymbolsParser},
     utils::dump_balances,
 };

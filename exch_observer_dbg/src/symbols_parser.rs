@@ -1,5 +1,5 @@
-use crate::types::{SymbolsParser};
-use exch_clients::{BinanceClient, KrakenClient, HuobiClient};
+use crate::types::SymbolsParser;
+use exch_clients::{BinanceClient, HuobiClient, KrakenClient};
 use exch_observer_types::{ArbitrageExchangeSymbol, ExchangeClient};
 
 pub struct BinanceSymbolsParser {
@@ -34,10 +34,7 @@ pub struct HuobiSymbolsParser {
 
 impl HuobiSymbolsParser {
     pub fn new(api_key: Option<String>, secret_key: Option<String>) -> Self {
-        let client = HuobiClient::new(
-            api_key,
-            secret_key
-        );
+        let client = HuobiClient::new(api_key, secret_key);
 
         Self { client }
     }

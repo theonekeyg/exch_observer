@@ -1,13 +1,11 @@
-use std::{
-    hash::Hash,
-};
 use crate::types::{
-    ExchangeSymbol, ArbitrageExchangeSymbol, ExchangeAccount,
-    ExchangeAccountState, ExchangeAccountType
+    ArbitrageExchangeSymbol, ExchangeAccount, ExchangeAccountState, ExchangeAccountType,
+    ExchangeSymbol,
 };
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use std::hash::Hash;
+use thiserror::Error;
 
 /// Huobi symbol info.
 /// Documentation: https://huobiapi.github.io/docs/spot/v1/en/#get-all-supported-trading-symbol-v1-deprecated.
@@ -98,12 +96,24 @@ impl From<HuobiSymbol> for ArbitrageExchangeSymbol {
             symbol.base,
             symbol.quote,
             symbol.symbol,
-            min_price.try_into().expect("Error converting min_price to Decimal"),
+            min_price
+                .try_into()
+                .expect("Error converting min_price to Decimal"),
             symbol.amount_precision,
-            qty_step_size.try_into().expect("Error converting qty_step_size to Decimal"),
-            min_price.try_into().expect("Error converting min_price to Decimal"),
-            symbol.min_order_value.try_into().expect("Error converting min_order_value to Decimal"),
-            symbol.limit_order_min_order_amt.try_into().expect("Error converting limit_order_min_order_amt to Decimal"),
+            qty_step_size
+                .try_into()
+                .expect("Error converting qty_step_size to Decimal"),
+            min_price
+                .try_into()
+                .expect("Error converting min_price to Decimal"),
+            symbol
+                .min_order_value
+                .try_into()
+                .expect("Error converting min_order_value to Decimal"),
+            symbol
+                .limit_order_min_order_amt
+                .try_into()
+                .expect("Error converting limit_order_min_order_amt to Decimal"),
         )
     }
 }
@@ -119,7 +129,7 @@ pub struct HuobiAccount {
     /// The type of sub account (applicable only for isolated margin accout)
     pub subtype: String,
     /// Account state
-    pub state: String
+    pub state: String,
 }
 
 impl Into<ExchangeAccount> for &HuobiAccount {
@@ -175,12 +185,12 @@ pub struct HuobiAccountBalanceData {
 /// Respose for `/v1/account/accounts/{account-id}/balance` API
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct HuobiAccountBalanceResponse {
-    pub status : String,
+    pub status: String,
     pub data: HuobiAccountBalanceData,
 }
 
 #[derive(Error, Debug, Clone, Hash, Serialize, Deserialize)]
 pub enum HuobiError {
     #[error("reqired api key wasn't privided for this request `{0}")]
-    ApiKeyNotProvided(String)
+    ApiKeyNotProvided(String),
 }

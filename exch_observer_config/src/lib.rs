@@ -11,7 +11,7 @@ pub struct KrakenConfig {
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
-    pub enable: bool
+    pub enable: bool,
 }
 
 /// Struct representing the configuration for the Binance observer
@@ -23,7 +23,7 @@ pub struct BinanceConfig {
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
-    pub enable: bool
+    pub enable: bool,
 }
 
 /// Struct representing the configuration for the Huobi observer
@@ -35,7 +35,7 @@ pub struct HuobiConfig {
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
-    pub enable: bool
+    pub enable: bool,
 }
 
 /// Struct for configuring the RPC server/client

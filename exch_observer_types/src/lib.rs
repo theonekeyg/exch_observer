@@ -1,5 +1,5 @@
 #![feature(associated_type_defaults)]
-pub mod types;
 pub mod exchanges;
-pub use types::*;
+pub mod types;
 pub use exchanges::*;
+pub use types::*;

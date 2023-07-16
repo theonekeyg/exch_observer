@@ -1,12 +1,12 @@
 use chrono::Utc;
 use exch_observer_types::{
-    ExchangeBalance, ExchangeClient, ExchangeAccount, ExchangeAccountType,
-    exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse, HuobiAccountBalanceResponse, HuobiError}
+    exchanges::huobi::{
+        HuobiAccountBalanceResponse, HuobiAccountsResponse, HuobiError, HuobiSymbol,
+    },
+    ExchangeAccount, ExchangeAccountType, ExchangeBalance, ExchangeClient,
 };
 use hmac::{Hmac, Mac};
-use reqwest::{
-    blocking::{Client as ReqwestClient, Request},
-};
+use reqwest::blocking::{Client as ReqwestClient, Request};
 use sha2::Sha256;
 use std::{
     collections::HashMap,
@@ -45,14 +45,20 @@ where
     }
 
     /// Checks if API keys are provided, returns them as a tuple if so. Otherwise returns an error.
-    fn unwrap_api_keys(&self, req_name: &str) -> Result<(&String, &String), Box<dyn std::error::Error>> {
+    fn unwrap_api_keys(
+        &self,
+        req_name: &str,
+    ) -> Result<(&String, &String), Box<dyn std::error::Error>> {
         if self.api_key.is_none() || self.secret_key.is_none() {
-            return Err(Box::new(HuobiError::ApiKeyNotProvided(
-                String::from(format!("API key wasn't provided for request: {}", req_name))
-            )));
+            return Err(Box::new(HuobiError::ApiKeyNotProvided(String::from(
+                format!("API key wasn't provided for request: {}", req_name),
+            ))));
         }
 
-        Ok((&self.api_key.as_ref().unwrap(), &self.secret_key.as_ref().unwrap()))
+        Ok((
+            &self.api_key.as_ref().unwrap(),
+            &self.secret_key.as_ref().unwrap(),
+        ))
     }
 
     /// Generates request signature for Huobi API. Returns base64-encoded signature string.
@@ -73,16 +79,22 @@ where
     }
 
     /// API to get information about acccounts of the user.
-    fn accounts(&self) -> Result<HashMap<ExchangeAccountType, ExchangeAccount>, Box<dyn std::error::Error>> {
-
+    fn accounts(
+        &self,
+    ) -> Result<HashMap<ExchangeAccountType, ExchangeAccount>, Box<dyn std::error::Error>> {
         let (api_key, _) = self.unwrap_api_keys("/v1/account/accounts")?;
 
-        let mut req = self.client.get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
+        let mut req = self
+            .client
+            .get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
             .query(&[
                 ("AccessKeyId", api_key.as_str()),
                 ("SignatureMethod", "HmacSHA256"),
                 ("SignatureVersion", "2"),
-                ("Timestamp", Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str()),
+                (
+                    "Timestamp",
+                    Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str(),
+                ),
             ])
             .build()?;
 
@@ -90,7 +102,9 @@ where
         let signature = self.get_signature(&req);
 
         // Add signature to the request query
-        req.url_mut().query_pairs_mut().append_pair("Signature", signature.as_str());
+        req.url_mut()
+            .query_pairs_mut()
+            .append_pair("Signature", signature.as_str());
 
         // Send request and get response body
         let res_body = self.client.execute(req)?.text()?;
@@ -109,17 +123,30 @@ where
     }
 
     /// API to get the balance of an account.
-    fn get_account_balance(&self, account_id: String)
-        -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
+    fn get_account_balance(
+        &self,
+        account_id: String,
+    ) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
+        let (api_key, _) =
+            self.unwrap_api_keys(&format!("/v1/account/accounts/{}/balance", account_id))?;
 
-        let (api_key, _) = self.unwrap_api_keys(&format!("/v1/account/accounts/{}/balance", account_id))?;
-
-        let mut req = self.client.get(format!("{}/v1/account/accounts/{}/balance", HUOBI_API_URL, account_id).as_str())
+        let mut req = self
+            .client
+            .get(
+                format!(
+                    "{}/v1/account/accounts/{}/balance",
+                    HUOBI_API_URL, account_id
+                )
+                .as_str(),
+            )
             .query(&[
                 ("AccessKeyId", api_key.as_str()),
                 ("SignatureMethod", "HmacSHA256"),
                 ("SignatureVersion", "2"),
-                ("Timestamp", Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str()),
+                (
+                    "Timestamp",
+                    Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str(),
+                ),
             ])
             .build()?;
 
@@ -127,7 +154,9 @@ where
         let signature = self.get_signature(&req);
 
         // Add signature to the request query
-        req.url_mut().query_pairs_mut().append_pair("Signature", signature.as_str());
+        req.url_mut()
+            .query_pairs_mut()
+            .append_pair("Signature", signature.as_str());
 
         // Send request and get response body
         let res_body = self.client.execute(req)?.text()?;
@@ -139,7 +168,9 @@ where
         let mut rv: HashMap<String, ExchangeBalance> = HashMap::new();
 
         for currency in res.data.list {
-            let balance = currency.balance.parse::<f64>()
+            let balance = currency
+                .balance
+                .parse::<f64>()
                 .expect("Failed to parse account balance");
 
             if balance > 0.0 {
@@ -149,13 +180,16 @@ where
                             balance_data.free = balance_data.free + balance;
                         } else {
                             let asset = currency.currency.clone();
-                            rv.insert(currency.currency, ExchangeBalance {
-                                asset: asset,
-                                free: balance,
-                                locked: 0.0,
-                            });
+                            rv.insert(
+                                currency.currency,
+                                ExchangeBalance {
+                                    asset: asset,
+                                    free: balance,
+                                    locked: 0.0,
+                                },
+                            );
                         }
-                    },
+                    }
                     _ => unimplemented!(),
                 }
             }
@@ -168,7 +202,8 @@ where
         let res_body =
             reqwest::blocking::get(format!("{}/v1/common/symbols", HUOBI_API_URL).as_str())?
                 .text()?;
-        let binding = serde_json::from_str::<serde_json::Value>(&res_body).expect("Failed to parse Huobi symbols response");
+        let binding = serde_json::from_str::<serde_json::Value>(&res_body)
+            .expect("Failed to parse Huobi symbols response");
 
         // Convert `data` field into Vec<HuobiSymbol>
         let symbols_vec = binding
@@ -203,23 +238,22 @@ where
     }
 
     /// Makes buy order on the exchange
-    fn buy_order(&self, _symbol: &Symbol, _qty: f64, _price: f64) {
-    }
+    fn buy_order(&self, _symbol: &Symbol, _qty: f64, _price: f64) {}
 
     /// Makes sell order on the exchange
-    fn sell_order(&self, _symbol: &Symbol, _qty: f64, _price: f64) {
-    }
+    fn sell_order(&self, _symbol: &Symbol, _qty: f64, _price: f64) {}
 
     /// Fetches balances for the current user whose api key is used
     fn get_balances(&self) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
-
-        // Fetch accounts 
+        // Fetch accounts
         let accounts = self.accounts()?;
         // Get spot account
-        let spot_account = accounts.get(&ExchangeAccountType::Spot)
+        let spot_account = accounts
+            .get(&ExchangeAccountType::Spot)
             .expect("Failed to get spot account");
         // Parse balances from spot account
-        let balances = self.get_account_balance(spot_account.id.clone())
+        let balances = self
+            .get_account_balance(spot_account.id.clone())
             .expect("Failed to construct balances");
 
         Ok(balances)
@@ -250,7 +284,7 @@ mod test {
     #[allow(dead_code)]
     use super::*;
 
-    use exch_observer_types::{ExchangeSymbol};
+    use exch_observer_types::ExchangeSymbol;
 
     const API_KEY: &str = "";
     const SECRET_KEY: &str = "";
@@ -259,22 +293,22 @@ mod test {
     fn test_signature() {
         let client = HuobiClient::<ExchangeSymbol>::new(
             Some(API_KEY.to_string()),
-            Some(SECRET_KEY.to_string())
+            Some(SECRET_KEY.to_string()),
         );
-        let req = client.client.get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
+        let req = client
+            .client
+            .get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
             .query(&[
                 ("AccessKeyId", API_KEY),
                 ("SignatureMethod", "HmacSHA256"),
                 ("SignatureVersion", "2"),
                 ("Timestamp", "2023-06-11T15:19:30"),
             ])
-            .build().expect("Failed to build request");
+            .build()
+            .expect("Failed to build request");
 
         let request = client.get_signature(&req);
-        assert_eq!(
-            request,
-            "MuR/t0iLoXEwHLyOoBgX1/dL/BE3wuhO4xVngjkM7vM="
-        );
+        assert_eq!(request, "MuR/t0iLoXEwHLyOoBgX1/dL/BE3wuhO4xVngjkM7vM=");
     }
 
     /*
