@@ -9,6 +9,7 @@ edition = "2021"
 binance = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+thiserror = { workspace = true }
 krakenrs = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }

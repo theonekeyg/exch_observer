@@ -2,7 +2,7 @@ use chrono::Utc;
 use exch_observer_types::{
     ArbitrageExchangeSymbol, ExchangeBalance, ExchangeClient, ExchangeSymbol,
     ExchangeAccount, ExchangeAccountType,
-    exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse, HuobiAccountBalanceResponse}
+    exchanges::huobi::{HuobiSymbol, HuobiAccountsResponse, HuobiAccountBalanceResponse, HuobiError}
 };
 use hmac::{Hmac, Mac};
 use reqwest::{
@@ -28,9 +28,9 @@ const HUOBI_API_URL: &'static str = "https://api.huobi.pro";
 /// Documentation - https://huobiapi.github.io/docs/spot/v1/en
 pub struct HuobiClient<Symbol: Eq + Hash + From<HuobiSymbol>> {
     /// Huobi API KEY
-    pub api_key: String,
+    pub api_key: Option<String>,
     /// Huobi Secret KEY
-    pub secret_key: String,
+    pub secret_key: Option<String>,
     pub client: ReqwestClient,
     marker: PhantomData<Symbol>,
 }
@@ -39,7 +39,7 @@ impl<Symbol> HuobiClient<Symbol>
 where
     Symbol: Eq + Hash + Clone + Display + Debug + Into<String> + From<HuobiSymbol>,
 {
-    pub fn new(api_key: String, secret_key: String) -> Self {
+    pub fn new(api_key: Option<String>, secret_key: Option<String>) -> Self {
         HuobiClient {
             api_key,
             secret_key,
@@ -48,8 +48,21 @@ where
         }
     }
 
+    /// Checks if API keys are provided, returns them as a tuple if so. Otherwise returns an error.
+    fn unwrap_api_keys(&self, req_name: &str) -> Result<(&String, &String), Box<dyn std::error::Error>> {
+        if self.api_key.is_none() || self.secret_key.is_none() {
+            return Err(Box::new(HuobiError::ApiKeyNotProvided(
+                String::from(format!("API key wasn't provided for request: {}", req_name))
+            )));
+        }
+
+        Ok((&self.api_key.as_ref().unwrap(), &self.secret_key.as_ref().unwrap()))
+    }
+
+    /// Generates request signature for Huobi API. Returns base64-encoded signature string.
     pub fn get_signature(&self, req: &Request) -> String {
-        let mut mac = HuobiSignature::new_from_slice(self.secret_key.as_bytes()).unwrap();
+        let mut mac = HuobiSignature::new_from_slice(self.secret_key.as_ref().unwrap().as_bytes())
+            .expect("Failed to create HMAC-SHA256 instance");
 
         let method = format!("{}", req.method().as_str());
         let host = format!("{}", req.url().host_str().unwrap_or(HUOBI_API_URL));
@@ -63,11 +76,14 @@ where
         base64::encode(mac.finalize().into_bytes())
     }
 
+    /// API to get information about acccounts of the user.
     fn accounts(&self) -> Result<HashMap<ExchangeAccountType, ExchangeAccount>, Box<dyn std::error::Error>> {
+
+        let (api_key, secret_key) = self.unwrap_api_keys("/v1/account/accounts")?;
 
         let mut req = self.client.get(format!("{}/v1/account/accounts", HUOBI_API_URL).as_str())
             .query(&[
-                ("AccessKeyId", self.api_key.as_str()),
+                ("AccessKeyId", api_key.as_str()),
                 ("SignatureMethod", "HmacSHA256"),
                 ("SignatureVersion", "2"),
                 ("Timestamp", Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str()),
@@ -96,11 +112,15 @@ where
         Ok(res)
     }
 
+    /// API to get the balance of an account.
     fn get_account_balance(&self, account_id: String)
         -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
+
+        let (api_key, secret_key) = self.unwrap_api_keys(&format!("/v1/account/accounts/{}/balance", account_id))?;
+
         let mut req = self.client.get(format!("{}/v1/account/accounts/{}/balance", HUOBI_API_URL, account_id).as_str())
             .query(&[
-                ("AccessKeyId", self.api_key.as_str()),
+                ("AccessKeyId", api_key.as_str()),
                 ("SignatureMethod", "HmacSHA256"),
                 ("SignatureVersion", "2"),
                 ("Timestamp", Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string().as_str()),
@@ -252,16 +272,7 @@ mod test {
         );
     }
 
-    // #[test]
-    // fn test_fetch_symbols() {
-    //     let client = HuobiClient::<ArbitrageExchangeSymbol>::new(
-    //         API_KEY.to_string(),
-    //         SECRET_KEY.to_string(),
-    //     );
-    //     let accounts = client.accounts().unwrap();
-    //     panic!("Accounts: {:?}", accounts);
-    // }
-
+    /*
     #[test]
     fn test_account_balance() {
         let client = HuobiClient::<ArbitrageExchangeSymbol>::new(
@@ -272,4 +283,5 @@ mod test {
         let accounts = client.get_balances().unwrap();
         panic!("Accounts: {:?}", accounts);
     }
+    */
 }

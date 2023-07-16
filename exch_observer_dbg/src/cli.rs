@@ -19,7 +19,7 @@ use tokio::runtime::Builder as RuntimeBuilder;
 
 use crate::{
     scanner::SymbolScanner,
-    symbols_parser::{BinanceSymbolsParser, KrakenSymbolsParser},
+    symbols_parser::{BinanceSymbolsParser, KrakenSymbolsParser, HuobiSymbolsParser},
     types::{ArbitrageExchangeSymbolRow, SymbolsParser},
     utils::dump_balances,
 };
@@ -308,6 +308,7 @@ impl TradeUtilsCli {
         let parser: Box<dyn SymbolsParser> = match network {
             ExchangeObserverKind::Binance => Box::new(BinanceSymbolsParser::new(None, None)),
             ExchangeObserverKind::Kraken => Box::new(KrakenSymbolsParser::new(None, None)),
+            ExchangeObserverKind::Huobi => Box::new(HuobiSymbolsParser::new(None, None)),
             _ => panic!("Not implemented yet"),
         };
 
@@ -342,6 +343,13 @@ impl TradeUtilsCli {
                     .unwrap(),
                 ExchangeObserverKind::Kraken => obs_config
                     .kraken
+                    .as_ref()
+                    .unwrap()
+                    .allowed_symbols
+                    .as_ref()
+                    .unwrap(),
+                ExchangeObserverKind::Huobi => obs_config
+                    .huobi
                     .as_ref()
                     .unwrap()
                     .allowed_symbols

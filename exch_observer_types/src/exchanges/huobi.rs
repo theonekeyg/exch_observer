@@ -6,6 +6,7 @@ use crate::types::{
     ExchangeAccountState, ExchangeAccountType, ExchangeBalance
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use rust_decimal::Decimal;
 
 /// Huobi symbol info.
@@ -176,4 +177,10 @@ pub struct HuobiAccountBalanceData {
 pub struct HuobiAccountBalanceResponse {
     pub status : String,
     pub data: HuobiAccountBalanceData,
+}
+
+#[derive(Error, Debug, Clone, Hash, Serialize, Deserialize)]
+pub enum HuobiError {
+    #[error("reqired api key wasn't privided for this request `{0}")]
+    ApiKeyNotProvided(String)
 }
