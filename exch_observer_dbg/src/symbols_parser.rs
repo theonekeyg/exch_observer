@@ -1,6 +1,6 @@
-use crate::types::{ArbitrageExchangeSymbolRow, SymbolsParser};
+use crate::types::{SymbolsParser};
 use exch_clients::{BinanceClient, KrakenClient, HuobiClient};
-use exch_observer_types::{ArbitrageExchangeSymbol, ExchangeClient, PairedExchangeSymbol};
+use exch_observer_types::{ArbitrageExchangeSymbol, ExchangeClient};
 
 pub struct BinanceSymbolsParser {
     pub client: BinanceClient<ArbitrageExchangeSymbol>,

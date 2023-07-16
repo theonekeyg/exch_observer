@@ -1,10 +1,6 @@
 use exch_observer_types::{ArbitrageExchangeSymbol, PairedExchangeSymbol};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Display, Formatter},
-    hash::{Hash, Hasher},
-};
 
 /// CSV row of symbol
 #[derive(Debug, Clone, Serialize, Deserialize)]

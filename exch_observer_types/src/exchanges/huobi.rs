@@ -3,7 +3,7 @@ use std::{
 };
 use crate::types::{
     ExchangeSymbol, ArbitrageExchangeSymbol, ExchangeAccount,
-    ExchangeAccountState, ExchangeAccountType, ExchangeBalance
+    ExchangeAccountState, ExchangeAccountType
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
