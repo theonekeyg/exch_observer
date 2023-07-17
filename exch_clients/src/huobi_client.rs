@@ -1,3 +1,4 @@
+use base64::{Engine as _, engine::general_purpose};
 use chrono::Utc;
 use exch_observer_types::{
     exchanges::huobi::{
@@ -74,8 +75,9 @@ where
         // Concatenate method, host, path and query into single stirng
         let body = format!("{}\n{}\n{}\n{}", method, host, path, query);
 
+        // Generate signature and encode as base64
         mac.update(body.as_ref());
-        base64::encode(mac.finalize().into_bytes())
+        general_purpose::STANDARD.encode(mac.finalize().into_bytes())
     }
 
     /// API to get information about acccounts of the user.
