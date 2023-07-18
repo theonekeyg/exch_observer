@@ -1,7 +1,6 @@
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
 use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
-use exch_clients::BinanceClient;
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeObserverKind, ExchangeValues, OrderedExchangeSymbol,
@@ -12,34 +11,9 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     io,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
 };
 use tokio::runtime::Runtime;
-
-struct ExchangeClientsTuple<Symbol>
-where
-    Symbol:
-        Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
-{
-    pub binance_client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
-}
-
-impl<Symbol> ExchangeClientsTuple<Symbol>
-where
-    Symbol:
-        Eq + Hash + Clone + Display + Debug + Into<String> + Send + Sync + From<BSymbol> + 'static,
-{
-    pub fn new() -> Self {
-        Self {
-            binance_client: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn set_binance_client(&mut self, client: Arc<RwLock<BinanceClient<Symbol>>>) {
-        self.binance_client = Some(client);
-    }
-}
 
 /// Main struct for the observer, contains all the observers, using this
 /// as main observer for bots & other services is recommended and not
@@ -64,7 +38,6 @@ where
     // TODO: Rewrite `clients` back to dynamic hashmap like `observers`,
     // turns out we can use `downcast_mut` to get the correct inner type
     // for each client, so struct functions will be available
-    clients: ExchangeClientsTuple<Symbol>,
     pub is_running: bool,
     pub config: ObserverConfig,
     pub runtime: Option<Arc<Runtime>>,
@@ -87,7 +60,6 @@ where
     pub fn new(config: ObserverConfig) -> Self {
         let rv = Self {
             observers: HashMap::new(),
-            clients: ExchangeClientsTuple::new(),
             is_running: false,
             config: config,
             runtime: None,
@@ -100,7 +72,6 @@ where
     pub fn new_with_runtime(config: ObserverConfig, async_runtime: Arc<Runtime>) -> Self {
         Self {
             observers: HashMap::new(),
-            clients: ExchangeClientsTuple::new(),
             is_running: false,
             config: config,
             runtime: Some(async_runtime),
@@ -110,17 +81,6 @@ where
     /// Sets the tokio runtime for the observer.
     pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
         self.runtime = Some(runtime);
-    }
-
-    #[allow(dead_code)]
-    fn create_clients(&mut self) {
-        if let Some(binance_config) = &self.config.binance {
-            let binance_client = Arc::new(RwLock::new(BinanceClient::new(
-                binance_config.api_key.clone(),
-                binance_config.api_secret.clone(),
-            )));
-            self.clients.set_binance_client(binance_client);
-        }
     }
 
     /// Creates observers for each exchange in the config, must be called before `load_symbols`.
@@ -138,9 +98,7 @@ where
         // Create observers based on the provided config
         if let Some(conf) = &self.config.binance {
             if conf.enable {
-                let binance_client = self.clients.binance_client.clone();
-
-                let binance_observer = BinanceObserver::new(binance_client, runtime.clone());
+                let binance_observer = BinanceObserver::new(runtime.clone());
                 self.observers
                     .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
             }

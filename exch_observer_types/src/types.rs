@@ -163,7 +163,6 @@ impl Into<String> for &ArbitrageExchangeSymbol {
 impl From<BSymbol> for ArbitrageExchangeSymbol {
     /// Converts a Binance symbol into an ArbitrageExchangeSymbol
     fn from(symbol: BSymbol) -> Self {
-
         let mut base_asset = symbol.base_asset;
         let mut quote_asset = symbol.quote_asset;
         // Convert symbols to lowercase
