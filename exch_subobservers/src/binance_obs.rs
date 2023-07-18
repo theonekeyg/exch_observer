@@ -11,13 +11,12 @@ use std::{
     hash::Hash,
     ops::Deref,
     str::FromStr,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
     vec::Vec,
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
 
 use crate::internal::ObserverWorkerThreadData;
-use exch_clients::BinanceClient;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
     SwapOrder, USD_STABLES,
@@ -111,8 +110,6 @@ where
     /// map from already concatenated pair names, when turning concatenated string into
     /// ExchangeSymbol is impossible.
     price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
-    #[allow(dead_code)]
-    client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 
     /// Necessary for getting control of the threads execution from a function.
@@ -144,15 +141,11 @@ where
         + PairedExchangeSymbol
         + 'static,
 {
-    pub fn new(
-        client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
-        async_runner: Arc<Runtime>,
-    ) -> Self {
+    pub fn new(async_runner: Arc<Runtime>) -> Self {
         Self {
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
-            client: client,
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),

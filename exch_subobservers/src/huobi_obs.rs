@@ -43,7 +43,6 @@ where
     pub watching_symbols: Vec<Symbol>,
     pub connected_symbols: HashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>,
     price_table: Arc<HashMap<String, Arc<Mutex<AskBidValues>>>>,
-    // client: Option<Arc<RwLock<BinanceClient<Symbol>>>>,
     async_runner: Arc<Runtime>,
 
     /// Necessary for getting control of the threads execution from a function.
@@ -79,7 +78,6 @@ where
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(HashMap::new()),
-            // client: client,
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
