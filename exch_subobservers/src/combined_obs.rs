@@ -34,13 +34,14 @@ where
         + Sync
         + 'static,
 {
+    /// Internal map of observers, use CombinedObserver functions to access individual observers.
     pub observers:
         HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
-    // TODO: Rewrite `clients` back to dynamic hashmap like `observers`,
-    // turns out we can use `downcast_mut` to get the correct inner type
-    // for each client, so struct functions will be available
+    /// Flag indicating if the observer threads are running.
     pub is_running: bool,
+    /// Configuration for the observer.
     pub config: ObserverConfig,
+    /// Tokio runtime for the observer.
     pub runtime: Option<Arc<Runtime>>,
 }
 

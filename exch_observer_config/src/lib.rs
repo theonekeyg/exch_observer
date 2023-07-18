@@ -5,8 +5,6 @@ use serde::Deserialize;
 /// Struct representing the configuration for the Kraken observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct KrakenConfig {
-    pub api_key: Option<String>,
-    pub api_secret: Option<String>,
     pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
@@ -17,8 +15,6 @@ pub struct KrakenConfig {
 /// Struct representing the configuration for the Binance observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct BinanceConfig {
-    pub api_key: Option<String>,
-    pub api_secret: Option<String>,
     pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
@@ -29,8 +25,6 @@ pub struct BinanceConfig {
 /// Struct representing the configuration for the Huobi observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct HuobiConfig {
-    pub api_key: Option<String>,
-    pub api_secret: Option<String>,
     pub allowed_symbols: Option<Vec<String>>,
     /// Path to .csv file containing symbols to monitor
     pub symbols_path: String,
