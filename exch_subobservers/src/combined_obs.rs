@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
 use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
@@ -84,15 +85,15 @@ where
     }
 
     /// Creates observers for each exchange in the config, must be called before `load_symbols`.
-    pub fn create_observers(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn create_observers(&mut self) -> Result<()> {
         // Make sure we have a valid tokio runtime
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
-            return Err(Box::new(io::Error::new(
+            return Err(io::Error::new(
                 io::ErrorKind::Other,
                 "No runtime set",
-            )));
+            ).into());
         };
 
         // Create observers based on the provided config
