@@ -11,12 +11,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::runtime::Runtime;
 
 /// Interface to Kraken REST API.
 pub struct KrakenClient<Symbol: Eq + Hash> {
     pub api: Arc<KrakenRestAPI>,
-    pub runtime: Option<Arc<Runtime>>,
     marker: PhantomData<Symbol>,
 }
 
@@ -38,101 +36,8 @@ where
 
         Self {
             api: Arc::new(api),
-            runtime: None,
             marker: PhantomData,
         }
-    }
-
-    pub fn new_with_runtime(api_key: String, api_secret: String, runtime: Arc<Runtime>) -> Self {
-        let creds = KrakenCredentials {
-            key: api_key,
-            secret: api_secret,
-        };
-
-        let config = KrakenRestConfig {
-            timeout: Duration::from_secs(10),
-            creds: creds,
-        };
-
-        let api = KrakenRestAPI::try_from(config).unwrap();
-
-        Self {
-            api: Arc::new(api),
-            runtime: Some(runtime),
-            marker: PhantomData,
-        }
-    }
-
-    pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
-        self.runtime = Some(runtime);
-    }
-
-    pub fn has_runtime(&self) -> bool {
-        self.runtime.is_some()
-    }
-
-    fn buy_order1(runner: &Runtime, api: Arc<KrakenRestAPI>, symbol: Symbol, qty: f64, price: f64) {
-        let symbol: String = symbol.into();
-        runner.spawn_blocking(move || {
-            info!(
-                "calling Buy order on symbol: {}; qty: {}; price: {}",
-                &symbol, qty, price
-            );
-
-            let oflags = BTreeSet::from_iter(vec![OrderFlag::Fciq]);
-            let res = api.add_limit_order(
-                LimitOrder {
-                    bs_type: BsType::Buy,
-                    volume: qty.to_string(),
-                    pair: symbol,
-                    price: price.to_string(),
-                    oflags: oflags,
-                },
-                None, // userref
-                false,
-            );
-
-            if let Ok(res) = res {
-                info!("Buy order completed: {:?}", res);
-            } else {
-                error!("Error placing buy order: {:?}", res.err().unwrap());
-            }
-        });
-    }
-
-    fn sell_order1(
-        runner: &Runtime,
-        api: Arc<KrakenRestAPI>,
-        symbol: Symbol,
-        qty: f64,
-        price: f64,
-    ) {
-        let symbol: String = symbol.into();
-        runner.spawn_blocking(move || {
-            info!(
-                "calling Buy order on symbol: {}; qty: {}; price: {}",
-                &symbol, qty, price
-            );
-
-            let oflags = BTreeSet::from_iter(vec![OrderFlag::Fcib]);
-            let res = api.add_limit_order(
-                LimitOrder {
-                    bs_type: BsType::Sell,
-                    volume: qty.to_string(),
-                    pair: symbol,
-                    price: price.to_string(),
-                    oflags: oflags,
-                },
-                None, // userref
-                false,
-            );
-
-            if let Ok(res) = res {
-                info!("Buy order completed: {:?}", res);
-            } else {
-                error!("Error placing buy order: {:?}", res.err().unwrap());
-            }
-        });
     }
 
     /// Fetches symbols from the exchange, performs no filtration of modification of symbols
@@ -177,22 +82,56 @@ where
 
     /// Sends Buy GTC limit order to Kraken REST API
     fn buy_order(&self, symbol: &Symbol, qty: f64, price: f64) {
-        let runtime = if let Some(runtime) = &self.runtime {
-            runtime.clone()
+        info!(
+            "calling Buy order on symbol: {}; qty: {}; price: {}",
+            &symbol, qty, price
+        );
+
+        let oflags = BTreeSet::from_iter(vec![OrderFlag::Fciq]);
+        let res = self.api.add_limit_order(
+            LimitOrder {
+                bs_type: BsType::Buy,
+                volume: qty.to_string(),
+                pair: symbol.to_string(),
+                price: price.to_string(),
+                oflags: oflags,
+            },
+            None, // userref
+            false,
+        );
+
+        if let Ok(res) = res {
+            info!("Buy order completed: {:?}", res);
         } else {
-            panic!("No runtime set for KrakenClient, cannot execute buy order");
-        };
-        Self::buy_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
+            error!("Error placing buy order: {:?}", res.err().unwrap());
+        }
     }
 
     /// Sends Sell GTC limit order to Kraken REST API
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64) {
-        let runtime = if let Some(runtime) = &self.runtime {
-            runtime.clone()
+        info!(
+            "calling Buy order on symbol: {}; qty: {}; price: {}",
+            &symbol, qty, price
+        );
+
+        let oflags = BTreeSet::from_iter(vec![OrderFlag::Fcib]);
+        let res = self.api.add_limit_order(
+            LimitOrder {
+                bs_type: BsType::Sell,
+                volume: qty.to_string(),
+                pair: symbol.to_string(),
+                price: price.to_string(),
+                oflags: oflags,
+            },
+            None, // userref
+            false,
+        );
+
+        if let Ok(res) = res {
+            info!("Buy order completed: {:?}", res);
         } else {
-            panic!("No runtime set for KrakenClient, cannot execute sell order");
-        };
-        Self::sell_order1(&runtime, self.api.clone(), symbol.clone(), qty, price);
+            error!("Error placing buy order: {:?}", res.err().unwrap());
+        }
     }
 
     /// Fetches the balances for all assets from Kraken API

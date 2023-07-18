@@ -16,7 +16,6 @@ use std::{
     marker::PhantomData,
     sync::Arc,
 };
-use tokio::runtime::Runtime;
 
 /// Client for the Binance REST API, implemented using
 /// `https://github.com/wisespace-io/binance-rs.git` crate
@@ -27,7 +26,6 @@ pub struct BinanceClient<Symbol: Eq + Hash + From<BSymbol>> {
     pub market: Arc<Market>,
     /// General API
     pub general: Arc<General>,
-    pub runtime: Option<Arc<Runtime>>,
     marker: PhantomData<Symbol>,
 }
 
@@ -40,93 +38,8 @@ where
             account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
             market: Arc::new(Market::new(api_key.clone(), secret_key.clone())),
             general: Arc::new(General::new(api_key, secret_key)),
-            runtime: None,
             marker: PhantomData,
         }
-    }
-
-    pub fn new_with_runtime(
-        api_key: Option<String>,
-        secret_key: Option<String>,
-        async_runner: Arc<Runtime>,
-    ) -> Self {
-        Self {
-            account: Arc::new(Account::new(api_key.clone(), secret_key.clone())),
-            market: Arc::new(Market::new(api_key.clone(), secret_key.clone())),
-            general: Arc::new(General::new(api_key, secret_key)),
-            runtime: Some(async_runner),
-            marker: PhantomData,
-        }
-    }
-
-    pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
-        self.runtime = Some(runtime);
-    }
-
-    pub fn has_runtime(&self) -> bool {
-        self.runtime.is_some()
-    }
-
-    /// Sends Buy GTC limit order to Binance REST API
-    fn buy_order1(runner: &Runtime, account: Arc<Account>, symbol: Symbol, qty: f64, price: f64) {
-        let mut symbol: String = symbol.into();
-        symbol.make_ascii_uppercase();
-        runner.spawn_blocking(move || {
-            info!(
-                "calling Buy order on symbol: {}; qty: {}; price: {}",
-                &symbol, qty, price
-            );
-            let recipe = account
-                .custom_order::<String, f64>(
-                    symbol.clone().into(),
-                    f64::try_from(qty).unwrap(),
-                    f64::try_from(price).unwrap(),
-                    None,
-                    OrderSide::Buy,
-                    OrderType::Limit,
-                    TimeInForce::GTC,
-                    None,
-                )
-                .unwrap();
-
-            info!(
-                "Trade [sym: {}, qty: {}, price: {}] successful, recipe: {:?}",
-                symbol, qty, price, recipe
-            );
-
-            recipe
-        });
-    }
-
-    /// Sends Sell GTC limit order to Binance REST API
-    fn sell_order1(runner: &Runtime, account: Arc<Account>, symbol: Symbol, qty: f64, price: f64) {
-        let mut symbol: String = symbol.into();
-        symbol.make_ascii_uppercase();
-        runner.spawn_blocking(move || {
-            info!(
-                "calling Sell order on symbol: {}; qty: {}; price: {}",
-                &symbol, qty, price
-            );
-            let recipe = account
-                .custom_order::<String, f64>(
-                    symbol.clone().into(),
-                    f64::try_from(qty).unwrap(),
-                    f64::try_from(price).unwrap(),
-                    None,
-                    OrderSide::Sell,
-                    OrderType::Limit,
-                    TimeInForce::GTC,
-                    None,
-                )
-                .unwrap();
-
-            info!(
-                "Trade [sym: {}, qty: {}, price: {}] successful, recipe: {:?}",
-                symbol, qty, price, recipe
-            );
-
-            recipe
-        });
     }
 
     fn fetch_symbols_unfiltered(&self) -> Result<Vec<BSymbol>, Box<dyn std::error::Error>> {
@@ -172,22 +85,56 @@ where
 
     /// Sends Buy GTC limit order to Binance REST API
     fn buy_order(&self, symbol: &Symbol, qty: f64, price: f64) {
-        let runtime = if let Some(runtime) = &self.runtime {
-            runtime.clone()
-        } else {
-            panic!("No runtime set for BinanceClient, cannot execute buy order");
-        };
-        Self::buy_order1(&runtime, self.account.clone(), symbol.clone(), qty, price);
+        info!(
+            "calling Buy order on symbol: {}; qty: {}; price: {}",
+            &symbol, qty, price
+        );
+        let recipe = self.account
+            .custom_order::<String, f64>(
+                symbol.clone().into(),
+                f64::try_from(qty).unwrap(),
+                f64::try_from(price).unwrap(),
+                None,
+                OrderSide::Buy,
+                OrderType::Limit,
+                TimeInForce::GTC,
+                None,
+            )
+            .unwrap();
+
+        info!(
+            "Trade [sym: {}, qty: {}, price: {}] successful, recipe: {:?}",
+            symbol, qty, price, recipe
+        );
+
+        // recipe
     }
 
     /// Sends Sell GTC limit order to Binance REST API
     fn sell_order(&self, symbol: &Symbol, qty: f64, price: f64) {
-        let runtime = if let Some(runtime) = &self.runtime {
-            runtime.clone()
-        } else {
-            panic!("No runtime set for BinanceClient, cannot execute sell order");
-        };
-        Self::sell_order1(&runtime, self.account.clone(), symbol.clone(), qty, price);
+        info!(
+            "calling Sell order on symbol: {}; qty: {}; price: {}",
+            &symbol, qty, price
+        );
+        let recipe = self.account
+            .custom_order::<String, f64>(
+                symbol.clone().into(),
+                f64::try_from(qty).unwrap(),
+                f64::try_from(price).unwrap(),
+                None,
+                OrderSide::Sell,
+                OrderType::Limit,
+                TimeInForce::GTC,
+                None,
+            )
+            .unwrap();
+
+        info!(
+            "Trade [sym: {}, qty: {}, price: {}] successful, recipe: {:?}",
+            symbol, qty, price, recipe
+        );
+
+        // recipe
     }
 
     /// Fetches the balances for all assets from Binance Account API
