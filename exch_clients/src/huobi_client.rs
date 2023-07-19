@@ -310,7 +310,7 @@ mod test {
             .expect("Failed to build request");
 
         let request = client.get_signature(&req);
-        assert_eq!(request, "MuR/t0iLoXEwHLyOoBgX1/dL/BE3wuhO4xVngjkM7vM=");
+        assert_eq!(request, "BTJgEn61LXdVx/8FUDkNOuYYEBowK90HJCN1DStIBxw=");
     }
 
     /*

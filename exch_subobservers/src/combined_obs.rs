@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
+use anyhow::Result;
 use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
@@ -91,10 +91,7 @@ where
         let runtime = if let Some(runtime) = &self.runtime {
             runtime.clone()
         } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "No runtime set",
-            ).into());
+            return Err(io::Error::new(io::ErrorKind::Other, "No runtime set").into());
         };
 
         // Create observers based on the provided config

@@ -89,7 +89,8 @@ where
             "calling Buy order on symbol: {}; qty: {}; price: {}",
             &symbol, qty, price
         );
-        let recipe = self.account
+        let recipe = self
+            .account
             .custom_order::<String, f64>(
                 symbol.clone().into(),
                 f64::try_from(qty).unwrap(),
@@ -116,7 +117,8 @@ where
             "calling Sell order on symbol: {}; qty: {}; price: {}",
             &symbol, qty, price
         );
-        let recipe = self.account
+        let recipe = self
+            .account
             .custom_order::<String, f64>(
                 symbol.clone().into(),
                 f64::try_from(qty).unwrap(),

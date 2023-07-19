@@ -1,42 +1,43 @@
+use serde::Deserialize;
 
-#[derive(Debug, Clone)]
-struct HuobiClientConfig {
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct HuobiClientConfig {
     /// API key for Huobi (HUOBI_API_KEY)
-    api_key: Option<String>,
+    pub api_key: Option<String>,
     /// API secret for Huobi (HUOBI_API_SECRET)
-    api_secret: Option<String>,
+    pub api_secret: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-struct KrakenClientConfig {
+#[derive(Debug, Clone, Deserialize)]
+pub struct KrakenClientConfig {
     /// API key for Kraken (KRAKEN_API_KEY)
-    api_key: String,
+    pub api_key: String,
     /// API secret for Kraken (KRAKEN_API_SECRET)
-    api_secret: String,
+    pub api_secret: String,
 }
 
-#[derive(Debug, Clone)]
-struct BinanceClientConfig {
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct BinanceClientConfig {
     /// API key for Binance (BINANCE_API_KEY)
-    api_key: Option<String>,
+    pub api_key: Option<String>,
     /// API secret for Binance (BINANCE_API_SECRET)
-    api_secret: Option<String>,
+    pub api_secret: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ClientConfig {
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct CombinedClientConfig {
     /// Binance client configuration
-    binance: Option<BinanceClientConfig>,
+    pub binance: Option<BinanceClientConfig>,
     /// Kraken client configuration
-    kraken: Option<KrakenClientConfig>,
+    pub kraken: Option<KrakenClientConfig>,
     /// Huobi client configuration
-    huobi: Option<HuobiClientConfig>,
+    pub huobi: Option<HuobiClientConfig>,
 }
 
-impl ClientConfig {
-    /// Create ClientConfig from environment variables.
+impl CombinedClientConfig {
+    /// Create CombinedClientConfig from environment variables.
     /// Variable names are listed in individual structs.
-    pub fn from_env() -> ClientConfig {
+    pub fn from_env() -> CombinedClientConfig {
         let binance_api_key = std::env::var("BINANCE_API_KEY");
         let binance_api_secret = std::env::var("BINANCE_API_SECRET");
         let binance_config = Some(BinanceClientConfig {
@@ -62,7 +63,7 @@ impl ClientConfig {
             api_secret: huobi_api_secret.ok(),
         });
 
-        ClientConfig {
+        CombinedClientConfig {
             binance: binance_config,
             kraken: kraken_config,
             huobi: huobi_config,
