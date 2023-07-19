@@ -168,14 +168,14 @@ static HUOBI_UNIQUE_ID: AtomicU64 = AtomicU64::new(1);
 /// Huobi WebSocket client
 pub struct HuobiWebsocket<'a> {
     pub socket: Option<(WebSocket<MaybeTlsStream<TcpStream>>, Response)>,
-    handler: Box<dyn FnMut(WebsocketEvent) -> WsResult<()> + 'a>,
+    handler: Box<dyn FnMut(WebsocketEvent) + 'a>,
 }
 
 impl<'a> HuobiWebsocket<'a> {
     /// Creates new HuobiWebsocket with provided function to handle events
     pub fn new<Callback>(handler: Callback) -> Self
     where
-        Callback: FnMut(WebsocketEvent) -> WsResult<()> + 'a,
+        Callback: FnMut(WebsocketEvent) + 'a,
     {
         Self {
             socket: None,
@@ -294,7 +294,7 @@ impl<'a> HuobiWebsocket<'a> {
                             }
                         };
 
-                        (self.handler)(ws_event).unwrap();
+                        (self.handler)(ws_event);
                     }
                     _ => {
                         panic!("Received some other message than binary: {:?}", msg);

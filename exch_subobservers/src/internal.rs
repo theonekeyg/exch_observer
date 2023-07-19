@@ -9,9 +9,7 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     ops::Deref,
-    sync::{
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
 
