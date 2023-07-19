@@ -5,7 +5,8 @@ use crate::{
 use anyhow::Result;
 use binance::model::Symbol as BSymbol;
 use exch_observer_types::{
-    exchanges::huobi::HuobiSymbol, ExchangeClient, ExchangeObserverKind, PairedExchangeSymbol, ExchangeBalance
+    exchanges::huobi::HuobiSymbol, ExchangeBalance, ExchangeClient, ExchangeObserverKind,
+    PairedExchangeSymbol,
 };
 use krakenrs::AssetPair;
 use std::{
@@ -78,7 +79,11 @@ where
     }
 
     /// Fetches the balance of the current logged in user
-    pub fn get_balance(&self, kind: ExchangeObserverKind, asset: &String) -> Option<ExchangeBalance> {
+    pub fn get_balance(
+        &self,
+        kind: ExchangeObserverKind,
+        asset: &String,
+    ) -> Option<ExchangeBalance> {
         if let Some(client) = self.clients.get(&kind) {
             client.get_balance(asset)
         } else {
@@ -101,7 +106,10 @@ where
     }
 
     /// Fetches balances for the current user whose api key is used
-    pub fn get_balances(&self, kind: ExchangeObserverKind) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
+    pub fn get_balances(
+        &self,
+        kind: ExchangeObserverKind,
+    ) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             Ok(client.get_balances()?)
         } else {
@@ -110,7 +118,10 @@ where
     }
 
     /// Fetches all symbols from the exchange and returns list of symbols
-    pub fn fetch_symbols(&self, kind: ExchangeObserverKind) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+    pub fn fetch_symbols(
+        &self,
+        kind: ExchangeObserverKind,
+    ) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             client.fetch_symbols()
         } else {
@@ -120,8 +131,10 @@ where
 
     #[allow(dead_code)]
     /// Fetches online symbols from the exchange and returns list of symbols
-    fn fetch_online_symbols(&self, kind: ExchangeObserverKind)
-        -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
+    fn fetch_online_symbols(
+        &self,
+        kind: ExchangeObserverKind,
+    ) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             client.fetch_online_symbols()
         } else {

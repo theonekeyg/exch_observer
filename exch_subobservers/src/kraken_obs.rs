@@ -1,11 +1,10 @@
-use crate::internal::{kraken_symbol, ObserverWorkerThreadData};
 use exch_apis::{
     common::{Result as WsResult, WebsocketEvent},
     kraken_ws::KrakenWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
-    SwapOrder,
+    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
 use log::{debug, info, trace};
 use std::{
@@ -18,6 +17,10 @@ use std::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 
 pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
+
+pub fn kraken_symbol(symbol: impl PairedExchangeSymbol) -> String {
+    format!("{}/{}", symbol.base(), symbol.quote())
+}
 
 pub struct KrakenObserver<Symbol>
 where

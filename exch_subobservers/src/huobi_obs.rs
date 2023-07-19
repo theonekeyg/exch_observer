@@ -1,11 +1,10 @@
-use crate::internal::ObserverWorkerThreadData;
 use exch_apis::{
     common::{Result as HuobiWsResult, WebsocketEvent},
     huobi_ws::HuobiWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol, PairedExchangeSymbol,
-    SwapOrder, USD_STABLES,
+    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder, USD_STABLES,
 };
 use log::{debug, info, trace};
 use std::{
