@@ -79,7 +79,7 @@ where
         + 'static,
     Impl: ExchangeObserver<Symbol>,
 {
-    pub fn new<F>(async_runner: Arc<Runtime>, spawn_callback: F) -> Self
+    pub fn new<F>(async_runner: Arc<Runtime>, symbols_queue_limit: usize, spawn_callback: F) -> Self
     where
         F: Fn(
                 &Runtime,
@@ -100,7 +100,7 @@ where
             threads_data_mapping: HashMap::new(),
             running_handles: vec![],
             symbols_in_queue: vec![],
-            symbols_queue_limit: 20,
+            symbols_queue_limit: symbols_queue_limit,
             marker: PhantomData,
             spawn_callback: Arc::new(spawn_callback),
         }

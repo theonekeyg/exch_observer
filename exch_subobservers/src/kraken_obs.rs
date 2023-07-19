@@ -53,7 +53,7 @@ where
 {
     pub fn new(async_runner: Arc<Runtime>) -> Self {
         Self {
-            driver: MulticonObserverDriver::new(async_runner, Self::launch_worker_multiple),
+            driver: MulticonObserverDriver::new(async_runner, 20, Self::launch_worker_multiple),
         }
     }
 
@@ -92,7 +92,10 @@ where
                     WebsocketEvent::BookTickerEvent(book) => {
                         let ask_price = book.best_ask;
                         let bid_price = book.best_bid;
-                        let sym_index = book.sym.clone();
+                        // let sym_index = book.sym.clone();
+                        // split sym_index (which has format of "<base>/<quote>") into two parts
+                        // and join them together
+                        let sym_index = book.sym.split('/').collect::<Vec<&str>>().join("");
                         let update_value = price_table.get(&sym_index).unwrap();
                         update_value
                             .lock()

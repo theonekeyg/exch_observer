@@ -54,7 +54,7 @@ where
 {
     pub fn new(async_runner: Arc<Runtime>) -> Self {
         Self {
-            driver: MulticonObserverDriver::new(async_runner, Self::launch_worker_multiple),
+            driver: MulticonObserverDriver::new(async_runner, 16, Self::launch_worker_multiple),
         }
     }
 
