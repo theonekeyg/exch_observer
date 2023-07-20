@@ -20,6 +20,18 @@ pub struct GetPriceResponse {
     #[prost(uint64, tag = "4")]
     pub timestamp: u64,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetSymbolsRequest {
+    #[prost(string, tag = "1")]
+    pub exchange: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetSymbolsResponse {
+    #[prost(string, repeated, tag = "1")]
+    pub symbols: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 /// Generated client implementations.
 pub mod exch_observer_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -130,6 +142,31 @@ pub mod exch_observer_client {
                 .insert(GrpcMethod::new("exch_observer_rpc.ExchObserver", "GetPrice"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_symbols(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetSymbolsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetSymbolsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/exch_observer_rpc.ExchObserver/GetSymbols",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("exch_observer_rpc.ExchObserver", "GetSymbols"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -144,6 +181,13 @@ pub mod exch_observer_server {
             request: tonic::Request<super::GetPriceRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetPriceResponse>,
+            tonic::Status,
+        >;
+        async fn get_symbols(
+            &self,
+            request: tonic::Request<super::GetSymbolsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetSymbolsResponse>,
             tonic::Status,
         >;
     }
@@ -255,6 +299,50 @@ pub mod exch_observer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GetPriceSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/exch_observer_rpc.ExchObserver/GetSymbols" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetSymbolsSvc<T: ExchObserver>(pub Arc<T>);
+                    impl<
+                        T: ExchObserver,
+                    > tonic::server::UnaryService<super::GetSymbolsRequest>
+                    for GetSymbolsSvc<T> {
+                        type Response = super::GetSymbolsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetSymbolsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move { (*inner).get_symbols(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetSymbolsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

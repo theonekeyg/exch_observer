@@ -4,6 +4,7 @@ package exch_observer_rpc;
 
 service ExchObserver {
     rpc GetPrice (GetPriceRequest) returns (GetPriceResponse) {}
+    rpc GetSymbols (GetSymbolsRequest) returns (GetSymbolsResponse) {}
 }
 
 message GetPriceRequest {
@@ -17,4 +18,12 @@ message GetPriceResponse {
     string quote = 2;
     double price = 3;
     uint64 timestamp = 4;
+}
+
+message GetSymbolsRequest {
+    string exchange = 1;
+}
+
+message GetSymbolsResponse {
+    repeated string symbols = 1;
 }
