@@ -555,7 +555,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 }
 
 /// Enum to represent an exchange type
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ExchangeObserverKind {
     Binance,
     Bitfinex,

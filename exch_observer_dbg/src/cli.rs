@@ -40,15 +40,19 @@ pub enum TradeUtilsCliCommand {
     ScanUninitializedSymbols {
         #[arg(short, long, default_value = "/home/keyg/.exch_observer/default.toml")]
         config: String,
-        #[arg(short, long, default_value = "all")]
+        #[arg(short, long, default_value = "binance")]
         network: String,
+        #[arg(long, default_value = "false")]
+        all: bool,
     },
 
     ScanUpdateTimes {
         #[arg(short, long, default_value = "/home/keyg/.exch_observer/default.toml")]
         config: String,
-        #[arg(short, long, default_value = "all")]
+        #[arg(short, long, default_value = "binance")]
         network: String,
+        #[arg(long, default_value = "false")]
+        all: bool,
     },
 
     FetchSymbols {
@@ -80,18 +84,22 @@ impl TradeUtilsCli {
     pub fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.command {
             TradeUtilsCliCommand::DiffBalances { old, rewrite } => {
-                info!("DiffBalances cmd with old = {}, rewrite: {}", old, rewrite);
+                info!("DiffBalances cmd with old = {}, rewrite = {}", old, rewrite);
                 self.diff_balances(old, *rewrite);
             }
-            TradeUtilsCliCommand::ScanUninitializedSymbols { config, network } => {
+            TradeUtilsCliCommand::ScanUninitializedSymbols { config, network, all } => {
                 info!(
-                    "ScanUninitializedSymbols cmd with config = {}, network = {}",
-                    config, network
+                    "ScanUninitializedSymbols cmd with config = {}, network = {}, all = {}",
+                    config, network, all
                 );
-                self.scan_uninitialized_symbols(config, network);
+                self.scan_uninitialized_symbols(config, network, *all);
             }
-            TradeUtilsCliCommand::ScanUpdateTimes { config, network } => {
-                self.scan_update_times(config, network);
+            TradeUtilsCliCommand::ScanUpdateTimes { config, network, all } => {
+                info!(
+                    "ScanUpdateTimes cmd with config = {}, network = {}, all = {}",
+                    config, network, all
+                );
+                self.scan_update_times(config, network, *all);
             }
             TradeUtilsCliCommand::FetchSymbols {
                 config,
@@ -99,6 +107,10 @@ impl TradeUtilsCli {
                 output,
                 all,
             } => {
+                info!(
+                    "FetchSymbols cmd with config = {}, network = {}, output = {}, all = {}",
+                    config, network, output, all
+                );
                 self.fetch_symbols(config, network, output, *all);
             }
         };
@@ -145,14 +157,15 @@ impl TradeUtilsCli {
         }
     }
 
-    fn scan_update_times<P: AsRef<Path>>(&self, config_path: P, _network: &String) {
-        // TODO: make use of _network argument
+    fn scan_update_times<P: AsRef<Path>>(&self, config_path: P, network_str: &String, _all: bool) {
+        let network = ExchangeObserverKind::from_str(network_str).expect("Invalid network");
+
         let runtime = RuntimeBuilder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
         let config = ExchObserverConfig::parse_config(config_path).unwrap();
-        let obs_config = &config.observer;
+        // let obs_config = &config.observer;
 
         let mut scanner = runtime.block_on(SymbolScanner::new(config.clone()));
 
@@ -172,63 +185,29 @@ impl TradeUtilsCli {
 
         let updates_vec = Rc::new(Mutex::new(Vec::new()));
 
-        if let Some(conf) = &obs_config.binance {
-            if conf.enable {
-                // Generate a new callback with captures values
-                let callback = callback_gen(ExchangeObserverKind::Binance, updates_vec.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Binance, callback));
+        // Generate a new callback with captures values
+        let callback = callback_gen(network.clone(), updates_vec.clone());
+        runtime.block_on(scanner.run_with_obs(network, callback));
 
-                let mut updates = updates_vec.lock().unwrap();
-                updates.sort_by(|a, b| a.3.cmp(&b.3));
+        let mut updates = updates_vec.lock().unwrap();
+        updates.sort_by(|a, b| a.3.cmp(&b.3));
 
-                for (network, symbol, price, timestamp) in updates.iter() {
-                    println!("{}, {}, {}, {}", network, symbol, price, timestamp);
-                }
-                updates.clear();
-            }
-        }
-
-        if let Some(conf) = &obs_config.huobi {
-            if conf.enable {
-                let callback = callback_gen(ExchangeObserverKind::Huobi, updates_vec.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Huobi, callback));
-
-                let mut updates = updates_vec.lock().unwrap();
-                updates.sort_by(|a, b| a.3.cmp(&b.3));
-
-                for (network, symbol, price, timestamp) in updates.iter() {
-                    println!("{}, {}, {}, {}", network, symbol, price, timestamp);
-                }
-                updates.clear();
-            }
-        }
-
-        if let Some(conf) = &obs_config.kraken {
-            if conf.enable {
-                let callback = callback_gen(ExchangeObserverKind::Kraken, updates_vec.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Kraken, callback));
-
-                let mut updates = updates_vec.lock().unwrap();
-                updates.sort_by(|a, b| a.3.cmp(&b.3));
-
-                for (network, symbol, price, timestamp) in updates.iter() {
-                    println!("{}, {}, {}, {}", network, symbol, price, timestamp);
-                }
-                updates.clear();
-            }
+        for (network, symbol, price, timestamp) in updates.iter() {
+            println!("{}, {}, {}, {}", network, symbol, price, timestamp);
         }
     }
 
     /// Scans all symbols from the config to find unintialized prices in the
     /// observer and prints them.
-    fn scan_uninitialized_symbols<P: AsRef<Path>>(&self, config_path: P, _network: &String) {
-        // TODO: make use of _network argument
+    fn scan_uninitialized_symbols<P: AsRef<Path>>(&self, config_path: P, network: &String, _all: bool) {
+        let network = ExchangeObserverKind::from_str(network).expect("Invalid network");
+
         let runtime = RuntimeBuilder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
         let config = ExchObserverConfig::parse_config(config_path).unwrap();
-        let obs_config = &config.observer;
+        // let obs_config = &config.observer;
 
         let mut scanner = runtime.block_on(SymbolScanner::new(config.clone()));
 
@@ -252,48 +231,13 @@ impl TradeUtilsCli {
         let total_locked: Rc<Mutex<usize>> = Rc::new(Mutex::new(0));
         let uninitialized_locked: Rc<Mutex<usize>> = Rc::new(Mutex::new(0));
 
-        if let Some(conf) = &obs_config.binance {
-            if conf.enable {
-                // Generate a new callback with captures values
-                let callback = callback_gen(uninitialized_locked.clone(), total_locked.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Binance, callback));
+        let callback = callback_gen(uninitialized_locked.clone(), total_locked.clone());
+        runtime.block_on(scanner.run_with_obs(network.clone(), callback));
 
-                // Get the values after the scan and print them
-                let mut uninitialized = uninitialized_locked.lock().unwrap();
-                let mut total = total_locked.lock().unwrap();
-                println!("[Binance] {}/{} is uninitialized", uninitialized, total);
-
-                // Reset the values for future scans
-                *total = 0;
-                *uninitialized = 0;
-            }
-        }
-
-        if let Some(conf) = &obs_config.huobi {
-            if conf.enable {
-                let callback = callback_gen(uninitialized_locked.clone(), total_locked.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Huobi, callback));
-
-                let mut uninitialized = uninitialized_locked.lock().unwrap();
-                let mut total = total_locked.lock().unwrap();
-                println!("[Huobi] {}/{} is uninitialized", uninitialized, total);
-
-                // Reset the values for future scans
-                *total = 0;
-                *uninitialized = 0;
-            }
-        }
-
-        if let Some(conf) = &obs_config.kraken {
-            if conf.enable {
-                let callback = callback_gen(uninitialized_locked.clone(), total_locked.clone());
-                runtime.block_on(scanner.run_with_obs(ExchangeObserverKind::Kraken, callback));
-
-                let uninitialized = uninitialized_locked.lock().unwrap();
-                let total = total_locked.lock().unwrap();
-                println!("[Kraken] {}/{} is uninitialized", uninitialized, total);
-            }
-        }
+        // Get the values after the scan and print them
+        let uninitialized = uninitialized_locked.lock().unwrap();
+        let total = total_locked.lock().unwrap();
+        println!("[{}] {}/{} is uninitialized", network.to_str(), uninitialized, total);
     }
 
     fn fetch_symbols<P: AsRef<Path>>(
