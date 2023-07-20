@@ -106,6 +106,27 @@ where
         }
     }
 
+    fn consume_queue_symbols(&mut self) {
+        if self.symbols_in_queue.len() > 0 {
+            let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
+
+            for sym in &self.symbols_in_queue {
+                self.threads_data_mapping
+                    .insert(sym.clone(), thread_data.clone());
+            }
+
+            let handle = (self.spawn_callback)(
+                self.async_runner.deref(),
+                &self.symbols_in_queue,
+                self.price_table.clone(),
+                thread_data.clone(),
+            );
+            self.running_handles.push((handle, thread_data.clone()));
+
+            self.symbols_in_queue.clear();
+        }
+    }
+
     pub fn get_interchanged_symbols(
         &self,
         symbol: &String,
@@ -149,22 +170,7 @@ where
             self.symbols_in_queue.push(symbol.clone());
 
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
-                let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
-
-                let handle = (self.spawn_callback)(
-                    self.async_runner.deref(),
-                    &self.symbols_in_queue,
-                    self.price_table.clone(),
-                    thread_data.clone(),
-                );
-                self.running_handles.push((handle, thread_data.clone()));
-
-                for sym in &self.symbols_in_queue {
-                    self.threads_data_mapping
-                        .insert(sym.clone(), thread_data.clone());
-                }
-
-                self.symbols_in_queue.clear();
+                self.consume_queue_symbols();
             }
 
             self.watching_symbols.push(symbol.clone())
@@ -203,22 +209,7 @@ where
 
     pub fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.symbols_in_queue.len() > 0 {
-            let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
-
-            for sym in &self.symbols_in_queue {
-                self.threads_data_mapping
-                    .insert(sym.clone(), thread_data.clone());
-            }
-
-            let handle = (self.spawn_callback)(
-                self.async_runner.deref(),
-                &self.symbols_in_queue,
-                self.price_table.clone(),
-                thread_data.clone(),
-            );
-            self.running_handles.push((handle, thread_data.clone()));
-
-            self.symbols_in_queue.clear();
+            self.consume_queue_symbols();
         }
 
         Ok(())
