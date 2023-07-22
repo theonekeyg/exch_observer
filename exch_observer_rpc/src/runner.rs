@@ -4,7 +4,7 @@ mod observer_rpc {
 use observer_rpc::{
     exch_observer_client::ExchObserverClient,
     exch_observer_server::{ExchObserver, ExchObserverServer},
-    GetPriceRequest, GetPriceResponse, GetSymbolsRequest, GetSymbolsResponse
+    GetPriceRequest, GetPriceResponse, GetSymbolsRequest, GetSymbolsResponse,
 };
 
 use exch_observer_config::RpcConfig;
@@ -81,16 +81,13 @@ impl ExchObserver for GrpcObserver {
 
     async fn get_symbols(
         &self,
-        request: Request<GetSymbolsRequest>
+        request: Request<GetSymbolsRequest>,
     ) -> Result<Response<GetSymbolsResponse>, Status> {
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
         let exchange = ExchangeObserverKind::from_str(&request.exchange).unwrap();
 
-        debug!(
-            "Received symbols request for exchange {}",
-            request.exchange
-        );
+        debug!("Received symbols request for exchange {}", request.exchange);
 
         let symbols = observer
             .get_watching_symbols(exchange)
@@ -99,9 +96,7 @@ impl ExchObserver for GrpcObserver {
             .map(|s| s.to_string())
             .collect();
 
-        Ok(Response::new(GetSymbolsResponse {
-            symbols: symbols,
-        }))
+        Ok(Response::new(GetSymbolsResponse { symbols: symbols }))
     }
 }
 

@@ -106,7 +106,7 @@ where
         }
     }
 
-    fn consume_queue_symbols(&mut self) {
+    fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
             let thread_data = Arc::new(ObserverWorkerThreadData::from(&self.symbols_in_queue));
 
@@ -170,7 +170,7 @@ where
             self.symbols_in_queue.push(symbol.clone());
 
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
-                self.consume_queue_symbols();
+                self.spawn_tasks_for_queue_symbols();
             }
 
             self.watching_symbols.push(symbol.clone())
@@ -209,7 +209,7 @@ where
 
     pub fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.symbols_in_queue.len() > 0 {
-            self.consume_queue_symbols();
+            self.spawn_tasks_for_queue_symbols();
         }
 
         Ok(())

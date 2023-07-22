@@ -78,8 +78,6 @@ pub struct TradeUtilsCli {
     command: TradeUtilsCliCommand,
 }
 
-trait MyCustomHelperTrait: FnMut(ExchangeSymbol, f64, u64) + Sized {}
-
 impl TradeUtilsCli {
     pub fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.command {
@@ -87,14 +85,22 @@ impl TradeUtilsCli {
                 info!("DiffBalances cmd with old = {}, rewrite = {}", old, rewrite);
                 self.diff_balances(old, *rewrite);
             }
-            TradeUtilsCliCommand::ScanUninitializedSymbols { config, network, all } => {
+            TradeUtilsCliCommand::ScanUninitializedSymbols {
+                config,
+                network,
+                all,
+            } => {
                 info!(
                     "ScanUninitializedSymbols cmd with config = {}, network = {}, all = {}",
                     config, network, all
                 );
                 self.scan_uninitialized_symbols(config, network, *all);
             }
-            TradeUtilsCliCommand::ScanUpdateTimes { config, network, all } => {
+            TradeUtilsCliCommand::ScanUpdateTimes {
+                config,
+                network,
+                all,
+            } => {
                 info!(
                     "ScanUpdateTimes cmd with config = {}, network = {}, all = {}",
                     config, network, all
@@ -199,7 +205,12 @@ impl TradeUtilsCli {
 
     /// Scans all symbols from the config to find unintialized prices in the
     /// observer and prints them.
-    fn scan_uninitialized_symbols<P: AsRef<Path>>(&self, config_path: P, network: &String, _all: bool) {
+    fn scan_uninitialized_symbols<P: AsRef<Path>>(
+        &self,
+        config_path: P,
+        network: &String,
+        _all: bool,
+    ) {
         let network = ExchangeObserverKind::from_str(network).expect("Invalid network");
 
         let runtime = RuntimeBuilder::new_multi_thread()
@@ -237,7 +248,12 @@ impl TradeUtilsCli {
         // Get the values after the scan and print them
         let uninitialized = uninitialized_locked.lock().unwrap();
         let total = total_locked.lock().unwrap();
-        println!("[{}] {}/{} is uninitialized", network.to_str(), uninitialized, total);
+        println!(
+            "[{}] {}/{} is uninitialized",
+            network.to_str(),
+            uninitialized,
+            total
+        );
     }
 
     fn fetch_symbols<P: AsRef<Path>>(
