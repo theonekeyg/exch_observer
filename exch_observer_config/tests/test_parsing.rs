@@ -9,6 +9,6 @@ fn test_config_parsing() {
     assert!(config.observer.binance.is_some());
 
     let binance_config = config.observer.binance.unwrap();
-    assert_eq!(config.num_threads, Some(4));
+    assert_eq!(config.num_threads, Some(16));
     assert_eq!(binance_config.symbols_path, "./assets/binance_symbols.csv");
 }
