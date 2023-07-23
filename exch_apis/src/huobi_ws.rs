@@ -4,7 +4,7 @@
  **/
 use libflate::gzip::Decoder;
 
-use log::{error, warn};
+use log::{error, trace, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -271,7 +271,7 @@ impl<'a> HuobiWebsocket<'a> {
                                 WebsocketEvent::KLineEvent(event.into())
                             }
                             HuobiWebsocketEvent::PingEvent(event) => {
-                                // debug!("Received ping event: {}", event.ping);
+                                trace!("Received ping event: {}", event.ping);
                                 socket
                                     .0
                                     .write_message(Message::Text(format!(
@@ -281,8 +281,8 @@ impl<'a> HuobiWebsocket<'a> {
                                     .map_err(|e| WebSocketError::WriteError(e.to_string()))?;
                                 continue;
                             }
-                            HuobiWebsocketEvent::StatusEvent(_event) => {
-                                // debug!("Received status event: {:?}", event);
+                            HuobiWebsocketEvent::StatusEvent(event) => {
+                                trace!("Received status event: {:?}", event);
                                 continue;
                             }
                             HuobiWebsocketEvent::BookTickerEvent(event) => {
