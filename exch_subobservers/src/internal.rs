@@ -8,10 +8,9 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    ops::Deref,
     sync::{Arc, Mutex},
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::runtime::Runtime;
 
 pub struct MulticonObserverDriver<Symbol, Impl>
 where
@@ -43,7 +42,6 @@ where
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<ObserverWorkerThreadData<Symbol>>>,
-    running_handles: Vec<(JoinHandle<()>, Arc<ObserverWorkerThreadData<Symbol>>)>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -52,13 +50,13 @@ where
 
     marker: PhantomData<Impl>,
 
+    /// Blocking callback that creates WS connections and updates the price table
     spawn_callback: Arc<
         dyn Fn(
-                &Runtime,
                 &Vec<Symbol>,
                 Arc<HashMap<String, Arc<Mutex<Impl::Values>>>>,
                 Arc<ObserverWorkerThreadData<Symbol>>,
-            ) -> JoinHandle<()>
+            )
             + Send
             + Sync
             + 'static,
@@ -78,15 +76,15 @@ where
         + PairedExchangeSymbol
         + 'static,
     Impl: ExchangeObserver<Symbol>,
+    Impl::Values: Send + 'static
 {
     pub fn new<F>(async_runner: Arc<Runtime>, symbols_queue_limit: usize, spawn_callback: F) -> Self
     where
         F: Fn(
-                &Runtime,
                 &Vec<Symbol>,
                 Arc<HashMap<String, Arc<Mutex<Impl::Values>>>>,
                 Arc<ObserverWorkerThreadData<Symbol>>,
-            ) -> JoinHandle<()>
+            )
             + Send
             + Sync
             + 'static,
@@ -98,7 +96,6 @@ where
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
-            running_handles: vec![],
             symbols_in_queue: vec![],
             symbols_queue_limit: symbols_queue_limit,
             marker: PhantomData,
@@ -115,13 +112,19 @@ where
                     .insert(sym.clone(), thread_data.clone());
             }
 
-            let handle = (self.spawn_callback)(
-                self.async_runner.deref(),
-                &self.symbols_in_queue,
-                self.price_table.clone(),
-                thread_data.clone(),
-            );
-            self.running_handles.push((handle, thread_data.clone()));
+            let spawn_callback = self.spawn_callback.clone();
+            let symbols_in_queue = self.symbols_in_queue.clone();
+            let price_table = self.price_table.clone();
+
+            // Spawn a new thread for the symbols in the queue
+            self.async_runner.clone().spawn_blocking(move || {
+                // Run main blocking callback
+                (spawn_callback)(
+                    &symbols_in_queue,
+                    price_table.clone(),
+                    thread_data.clone(),
+                );
+            });
 
             self.symbols_in_queue.clear();
         }

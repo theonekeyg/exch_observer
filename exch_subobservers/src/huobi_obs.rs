@@ -11,7 +11,7 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::runtime::Runtime;
 
 #[allow(unused)]
 fn kline_stream(symbol: &str, interval: &str) -> String {
@@ -59,11 +59,10 @@ where
     }
 
     fn launch_worker_multiple(
-        runner: &Runtime,
         symbols: &Vec<Symbol>,
         price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
         thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
-    ) -> JoinHandle<()> {
+    ) {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
             .iter()
@@ -72,35 +71,33 @@ where
                 book_ticker_stream(&sym)
             })
             .collect::<Vec<_>>();
-        runner.spawn_blocking(move || {
-            let mut websock = HuobiWebsocket::new(move |event: WebsocketEvent| match event {
-                WebsocketEvent::KLineEvent(kline) => {
-                    let price_high = kline.high;
-                    let price_low = kline.low;
-                    let price = (price_high + price_low) / 2.0;
-                    let sym_index = kline.sym.clone().to_ascii_lowercase();
-                    let update_value = price_table.get(&sym_index).unwrap();
-                    update_value
-                        .lock()
-                        .unwrap()
-                        .update_price((price_high, price_low));
-                    trace!("[{}] Price: {:?}", sym_index, price);
-                }
-                WebsocketEvent::BookTickerEvent(book) => {
-                    let ask_price = book.best_ask;
-                    let bid_price = book.best_bid;
-                    let sym_index = book.sym.clone().to_ascii_lowercase();
-                    let update_value = price_table.get(&sym_index).unwrap();
-                    update_value
-                        .lock()
-                        .unwrap()
-                        .update_price((ask_price, bid_price));
-                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
-                }
-            });
-            websock.connect_multiple_streams(ws_query_subs).unwrap();
-            websock.event_loop(&thread_data.is_running).unwrap();
-        })
+        let mut websock = HuobiWebsocket::new(move |event: WebsocketEvent| match event {
+            WebsocketEvent::KLineEvent(kline) => {
+                let price_high = kline.high;
+                let price_low = kline.low;
+                let price = (price_high + price_low) / 2.0;
+                let sym_index = kline.sym.clone().to_ascii_lowercase();
+                let update_value = price_table.get(&sym_index).unwrap();
+                update_value
+                    .lock()
+                    .unwrap()
+                    .update_price((price_high, price_low));
+                trace!("[{}] Price: {:?}", sym_index, price);
+            }
+            WebsocketEvent::BookTickerEvent(book) => {
+                let ask_price = book.best_ask;
+                let bid_price = book.best_bid;
+                let sym_index = book.sym.clone().to_ascii_lowercase();
+                let update_value = price_table.get(&sym_index).unwrap();
+                update_value
+                    .lock()
+                    .unwrap()
+                    .update_price((ask_price, bid_price));
+                trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+            }
+        });
+        websock.connect_multiple_streams(ws_query_subs).unwrap();
+        websock.event_loop(&thread_data.is_running).unwrap();
     }
 }
 

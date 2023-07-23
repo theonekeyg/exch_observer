@@ -10,7 +10,7 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::runtime::Runtime;
 
 pub struct MockerObserver<Symbol>
 where
@@ -48,12 +48,11 @@ where
     }
 
     fn new_instance(
-        _runner: &Runtime,
         _symbols: &Vec<Symbol>,
         _price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
         _thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
-    ) -> JoinHandle<()> {
-        tokio::spawn(async {})
+    ) {
+        println!("new_instance()");
     }
 }
 
