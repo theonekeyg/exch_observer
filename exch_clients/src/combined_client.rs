@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Result;
 use binance::model::Symbol as BSymbol;
 use exch_observer_types::{
-    exchanges::huobi::HuobiSymbol, ExchangeBalance, ExchangeClient, ExchangeObserverKind,
+    exchanges::huobi::HuobiSymbol, ExchangeBalance, ExchangeClient, ExchangeKind,
     PairedExchangeSymbol,
 };
 use krakenrs::AssetPair;
@@ -19,7 +19,7 @@ use std::{
 /// through a single entity
 pub struct CombinedClient<Symbol: Eq + Hash> {
     /// Internal map of clients for each exchange
-    clients: HashMap<ExchangeObserverKind, Box<dyn ExchangeClient<Symbol>>>,
+    clients: HashMap<ExchangeKind, Box<dyn ExchangeClient<Symbol>>>,
     /// Configuration for the combined client, used to enable clients
     config: CombinedClientConfig,
 }
@@ -51,26 +51,26 @@ where
         if let Some(conf) = &self.config.binance {
             let client = BinanceClient::new(conf.api_key.clone(), conf.api_secret.clone());
             self.clients
-                .insert(ExchangeObserverKind::Binance, Box::new(client));
+                .insert(ExchangeKind::Binance, Box::new(client));
         }
 
         // Create huobi client
         if let Some(conf) = &self.config.huobi {
             let client = HuobiClient::new(conf.api_key.clone(), conf.api_secret.clone());
             self.clients
-                .insert(ExchangeObserverKind::Huobi, Box::new(client));
+                .insert(ExchangeKind::Huobi, Box::new(client));
         }
 
         // Create kraken client
         if let Some(conf) = &self.config.kraken {
             let client = KrakenClient::new(conf.api_key.clone(), conf.api_secret.clone());
             self.clients
-                .insert(ExchangeObserverKind::Kraken, Box::new(client));
+                .insert(ExchangeKind::Kraken, Box::new(client));
         }
     }
 
     /// Checks if symbol exists on the exchange
-    pub fn symbol_exists(&self, kind: ExchangeObserverKind, symbol: &Symbol) -> bool {
+    pub fn symbol_exists(&self, kind: ExchangeKind, symbol: &Symbol) -> bool {
         if let Some(client) = self.clients.get(&kind) {
             client.symbol_exists(symbol)
         } else {
@@ -81,7 +81,7 @@ where
     /// Fetches the balance of the current logged in user
     pub fn get_balance(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
         asset: &String,
     ) -> Option<ExchangeBalance> {
         if let Some(client) = self.clients.get(&kind) {
@@ -92,14 +92,14 @@ where
     }
 
     /// Makes buy order on the exchange
-    pub fn buy_order(&self, kind: ExchangeObserverKind, symbol: &Symbol, qty: f64, price: f64) {
+    pub fn buy_order(&self, kind: ExchangeKind, symbol: &Symbol, qty: f64, price: f64) {
         if let Some(client) = self.clients.get(&kind) {
             client.buy_order(symbol, qty, price)
         }
     }
 
     /// Makes sell order on the exchange
-    pub fn sell_order(&self, kind: ExchangeObserverKind, symbol: &Symbol, qty: f64, price: f64) {
+    pub fn sell_order(&self, kind: ExchangeKind, symbol: &Symbol, qty: f64, price: f64) {
         if let Some(client) = self.clients.get(&kind) {
             client.sell_order(symbol, qty, price)
         }
@@ -108,7 +108,7 @@ where
     /// Fetches balances for the current user whose api key is used
     pub fn get_balances(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
     ) -> Result<HashMap<String, ExchangeBalance>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             Ok(client.get_balances()?)
@@ -120,7 +120,7 @@ where
     /// Fetches all symbols from the exchange and returns list of symbols
     pub fn fetch_symbols(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
     ) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             client.fetch_symbols()
@@ -133,7 +133,7 @@ where
     /// Fetches online symbols from the exchange and returns list of symbols
     fn fetch_online_symbols(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
     ) -> Result<Vec<Symbol>, Box<dyn std::error::Error>> {
         if let Some(client) = self.clients.get(&kind) {
             client.fetch_online_symbols()
@@ -161,7 +161,7 @@ mod tests {
         };
         let mut client = CombinedClient::<ArbitrageExchangeSymbol>::new(config);
         client.create_clients();
-        let symbols = client.fetch_online_symbols(ExchangeObserverKind::Huobi);
+        let symbols = client.fetch_online_symbols(ExchangeKind::Huobi);
         panic!("{:?}", symbols);
         assert!(symbols.is_ok());
     }

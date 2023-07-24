@@ -4,7 +4,7 @@ use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeObserverKind, ExchangeValues, OrderedExchangeSymbol,
+    AskBidValues, ExchangeObserver, ExchangeKind, ExchangeValues, OrderedExchangeSymbol,
     PairedExchangeSymbol,
 };
 use std::{
@@ -36,7 +36,7 @@ where
 {
     /// Internal map of observers, use CombinedObserver functions to access individual observers.
     pub observers:
-        HashMap<ExchangeObserverKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
+        HashMap<ExchangeKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
     /// Flag indicating if the observer threads are running.
     pub is_running: bool,
     /// Configuration for the observer.
@@ -99,7 +99,7 @@ where
             if conf.enable {
                 let binance_observer = BinanceObserver::new(runtime.clone());
                 self.observers
-                    .insert(ExchangeObserverKind::Binance, Box::new(binance_observer));
+                    .insert(ExchangeKind::Binance, Box::new(binance_observer));
             }
         }
 
@@ -107,7 +107,7 @@ where
             if conf.enable {
                 let huobi_observer = HuobiObserver::new(runtime.clone());
                 self.observers
-                    .insert(ExchangeObserverKind::Huobi, Box::new(huobi_observer));
+                    .insert(ExchangeKind::Huobi, Box::new(huobi_observer));
             }
         }
 
@@ -115,7 +115,7 @@ where
             if conf.enable {
                 let kraken_observer = KrakenObserver::new(runtime.clone());
                 self.observers
-                    .insert(ExchangeObserverKind::Kraken, Box::new(kraken_observer));
+                    .insert(ExchangeKind::Kraken, Box::new(kraken_observer));
             }
         }
 
@@ -129,7 +129,7 @@ where
         // and add them to each observer we had in the config.
 
         if let Some(binance_config) = &self.config.binance {
-            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
+            if let Some(observer) = self.observers.get_mut(&ExchangeKind::Binance) {
                 // let mut observer = observer.downcast_mut::<BinanceObserver<Symbol>>().unwrap();
                 // observer.load_symbols_from_csv(f);
                 let mut rdr = Reader::from_path(&binance_config.symbols_path).unwrap();
@@ -149,7 +149,7 @@ where
         }
 
         if let Some(huobi_config) = &self.config.huobi {
-            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Huobi) {
+            if let Some(observer) = self.observers.get_mut(&ExchangeKind::Huobi) {
                 let mut rdr = Reader::from_path(&huobi_config.symbols_path).unwrap();
                 for result in rdr.records() {
                     let result = result.unwrap();
@@ -167,7 +167,7 @@ where
         }
 
         if let Some(kraken_config) = &self.config.kraken {
-            if let Some(observer) = self.observers.get_mut(&ExchangeObserverKind::Kraken) {
+            if let Some(observer) = self.observers.get_mut(&ExchangeKind::Kraken) {
                 let mut rdr = Reader::from_path(&kraken_config.symbols_path).unwrap();
                 for result in rdr.records() {
                     let result = result.unwrap();
@@ -189,7 +189,7 @@ where
     /// Useful when using exch_observer with trade bot locally, since uninitialized symbols might
     /// introduce various race-condition issues as well as intruduce potential bugs in
     /// calculations.
-    pub fn clear_uninitialized_symbols(&mut self, kind: ExchangeObserverKind) {
+    pub fn clear_uninitialized_symbols(&mut self, kind: ExchangeKind) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             let mut uninitialized_symbols = Vec::new();
 
@@ -216,15 +216,15 @@ where
         }
 
         // Start each observer.
-        if let Some(binance_observer) = self.observers.get_mut(&ExchangeObserverKind::Binance) {
+        if let Some(binance_observer) = self.observers.get_mut(&ExchangeKind::Binance) {
             binance_observer.start()?;
         }
 
-        if let Some(huobi_observer) = self.observers.get_mut(&ExchangeObserverKind::Huobi) {
+        if let Some(huobi_observer) = self.observers.get_mut(&ExchangeKind::Huobi) {
             huobi_observer.start()?;
         }
 
-        if let Some(kraken_observer) = self.observers.get_mut(&ExchangeObserverKind::Kraken) {
+        if let Some(kraken_observer) = self.observers.get_mut(&ExchangeKind::Kraken) {
             kraken_observer.start()?;
         }
 
@@ -239,7 +239,7 @@ where
     /// * `symbol` - The symbol to get the prices for.
     pub fn get_price(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
         symbol: &Symbol,
     ) -> Option<&Arc<Mutex<AskBidValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
@@ -250,7 +250,7 @@ where
     }
 
     /// Removes the symbol from the observer.
-    pub fn remove_symbol(&mut self, kind: ExchangeObserverKind, symbol: Symbol) {
+    pub fn remove_symbol(&mut self, kind: ExchangeKind, symbol: Symbol) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.remove_symbol(symbol);
         }
@@ -259,7 +259,7 @@ where
     /// Adds the symbol to the observer.
     pub fn add_price_to_monitor(
         &mut self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
         symbol: &Symbol,
         price: Arc<Mutex<AskBidValues>>,
     ) {
@@ -273,7 +273,7 @@ where
     /// (e.g. `eth` token can be exchanged in `ethusdt` `ethbtc` pairs).
     pub fn get_interchanged_symbols(
         &self,
-        kind: ExchangeObserverKind,
+        kind: ExchangeKind,
         symbol: &String,
     ) -> Option<&'_ Vec<OrderedExchangeSymbol<Symbol>>> {
         if let Some(observer) = self.observers.get(&kind) {
@@ -288,7 +288,7 @@ where
     /// pairs that this token can be exchanged in (looking for USD stables),
     /// if the token doesn't exist in any known USD stable pairs (in the same observer),
     /// None is returned.
-    pub fn get_usd_value(&self, kind: ExchangeObserverKind, symbol: &String) -> Option<f64> {
+    pub fn get_usd_value(&self, kind: ExchangeKind, symbol: &String) -> Option<f64> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_usd_value(symbol);
         }
@@ -297,7 +297,7 @@ where
     }
 
     /// Returns the reference to the `watching_symbols` in the observer.
-    pub fn get_watching_symbols(&self, kind: ExchangeObserverKind) -> Option<&'_ Vec<Symbol>> {
+    pub fn get_watching_symbols(&self, kind: ExchangeKind) -> Option<&'_ Vec<Symbol>> {
         if let Some(observer) = self.observers.get(&kind) {
             return Some(observer.get_watching_symbols());
         }

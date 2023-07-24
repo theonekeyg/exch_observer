@@ -8,7 +8,7 @@ use observer_rpc::{
 };
 
 use exch_observer_config::RpcConfig;
-use exch_observer_types::{ExchangeObserverKind, ExchangeSymbol, ExchangeValues};
+use exch_observer_types::{ExchangeKind, ExchangeSymbol, ExchangeValues};
 use exch_subobservers::CombinedObserver;
 use log::{debug, info};
 use std::{
@@ -55,7 +55,7 @@ impl ExchObserver for GrpcObserver {
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
         let symbol = ExchangeSymbol::from(&request.base, &request.quote);
-        let exchange = ExchangeObserverKind::from_str(&request.exchange).unwrap();
+        let exchange = ExchangeKind::from_str(&request.exchange).unwrap();
 
         debug!(
             "Received price request for symbol {} on exchange {}",
@@ -85,7 +85,7 @@ impl ExchObserver for GrpcObserver {
     ) -> Result<Response<GetSymbolsResponse>, Status> {
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
-        let exchange = ExchangeObserverKind::from_str(&request.exchange).unwrap();
+        let exchange = ExchangeKind::from_str(&request.exchange).unwrap();
 
         debug!("Received symbols request for exchange {}", request.exchange);
 

@@ -556,7 +556,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 
 /// Enum to represent an exchange type
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum ExchangeObserverKind {
+pub enum ExchangeKind {
     Binance,
     Bitfinex,
     Bitmex,
@@ -572,8 +572,8 @@ pub enum ExchangeObserverKind {
     Unknown,
 }
 
-impl ExchangeObserverKind {
-    /// Serializes ExchangeObserverKind to string
+impl ExchangeKind {
+    /// Serializes ExchangeKind to string
     pub fn to_str(&self) -> &'static str {
         match self {
             Self::Binance => "binance",
@@ -593,7 +593,7 @@ impl ExchangeObserverKind {
     }
 }
 
-impl FromStr for ExchangeObserverKind {
+impl FromStr for ExchangeKind {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

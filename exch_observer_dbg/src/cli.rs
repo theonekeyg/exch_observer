@@ -3,7 +3,7 @@ use csv::Writer as CsvWriter;
 use exch_clients::BinanceClient;
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_types::{
-    ExchangeBalance, ExchangeClient, ExchangeObserverKind, ExchangeSymbol, PairedExchangeSymbol,
+    ExchangeBalance, ExchangeClient, ExchangeKind, ExchangeSymbol, PairedExchangeSymbol,
 };
 use exch_observer_utils::get_current_timestamp;
 use log::{debug, info};
@@ -164,7 +164,7 @@ impl TradeUtilsCli {
     }
 
     fn scan_update_times<P: AsRef<Path>>(&self, config_path: P, network_str: &String, _all: bool) {
-        let network = ExchangeObserverKind::from_str(network_str).expect("Invalid network");
+        let network = ExchangeKind::from_str(network_str).expect("Invalid network");
 
         let runtime = RuntimeBuilder::new_multi_thread()
             .enable_all()
@@ -176,7 +176,7 @@ impl TradeUtilsCli {
         let mut scanner = runtime.block_on(SymbolScanner::new(config.clone()));
 
         let callback_gen =
-            move |kind: ExchangeObserverKind,
+            move |kind: ExchangeKind,
                   updates: Rc<Mutex<Vec<(String, ExchangeSymbol, f64, u64)>>>| {
                 let network = kind.to_str();
 
@@ -211,7 +211,7 @@ impl TradeUtilsCli {
         network: &String,
         _all: bool,
     ) {
-        let network = ExchangeObserverKind::from_str(network).expect("Invalid network");
+        let network = ExchangeKind::from_str(network).expect("Invalid network");
 
         let runtime = RuntimeBuilder::new_multi_thread()
             .enable_all()
@@ -264,11 +264,11 @@ impl TradeUtilsCli {
         all: bool,
     ) {
         // Get correct parser for the network
-        let network = ExchangeObserverKind::from_str(network).unwrap();
+        let network = ExchangeKind::from_str(network).unwrap();
         let parser: Box<dyn SymbolsParser> = match network {
-            ExchangeObserverKind::Binance => Box::new(BinanceSymbolsParser::new(None, None)),
-            ExchangeObserverKind::Kraken => Box::new(KrakenSymbolsParser::new(None, None)),
-            ExchangeObserverKind::Huobi => Box::new(HuobiSymbolsParser::new(None, None)),
+            ExchangeKind::Binance => Box::new(BinanceSymbolsParser::new(None, None)),
+            ExchangeKind::Kraken => Box::new(KrakenSymbolsParser::new(None, None)),
+            ExchangeKind::Huobi => Box::new(HuobiSymbolsParser::new(None, None)),
             _ => panic!("Not implemented yet"),
         };
 
@@ -294,21 +294,21 @@ impl TradeUtilsCli {
 
             // Get allowed symbols from config
             let allowed_symbols = match network {
-                ExchangeObserverKind::Binance => obs_config
+                ExchangeKind::Binance => obs_config
                     .binance
                     .as_ref()
                     .unwrap()
                     .allowed_symbols
                     .as_ref()
                     .unwrap(),
-                ExchangeObserverKind::Kraken => obs_config
+                ExchangeKind::Kraken => obs_config
                     .kraken
                     .as_ref()
                     .unwrap()
                     .allowed_symbols
                     .as_ref()
                     .unwrap(),
-                ExchangeObserverKind::Huobi => obs_config
+                ExchangeKind::Huobi => obs_config
                     .huobi
                     .as_ref()
                     .unwrap()

@@ -1,7 +1,7 @@
 use csv::Reader;
 use exch_observer_config::{ExchObserverConfig, ObserverConfig};
 use exch_observer_rpc::ObserverRpcClient;
-use exch_observer_types::{ExchangeObserverKind, ExchangeSymbol};
+use exch_observer_types::{ExchangeKind, ExchangeSymbol};
 use std::path::Path;
 
 /// SymbolScanner iteratres all the symbols in the observer config
@@ -26,7 +26,7 @@ impl SymbolScanner {
     /// from RPC API for the provided observer kind
     pub async fn scan_from_csv<P: AsRef<Path>>(
         &mut self,
-        observer: ExchangeObserverKind,
+        observer: ExchangeKind,
         symbols_path: P,
         mut f: impl FnMut(ExchangeSymbol, f64, u64),
     ) {
@@ -49,38 +49,38 @@ impl SymbolScanner {
     /// Executes the scan on provided observer with values from the config
     pub async fn run_with_obs(
         &mut self,
-        observer: ExchangeObserverKind,
+        observer: ExchangeKind,
         f: impl FnMut(ExchangeSymbol, f64, u64),
     ) {
         match &observer {
-            &ExchangeObserverKind::Binance => {
+            &ExchangeKind::Binance => {
                 let symbols_path = if let Some(binance_config) = &self.config.binance {
                     binance_config.symbols_path.clone()
                 } else {
                     panic!("No binance config found, but was requested");
                 };
 
-                self.scan_from_csv(ExchangeObserverKind::Binance, symbols_path, f)
+                self.scan_from_csv(ExchangeKind::Binance, symbols_path, f)
                     .await;
             }
-            &ExchangeObserverKind::Huobi => {
+            &ExchangeKind::Huobi => {
                 let symbols_path = if let Some(huobi_config) = &self.config.huobi {
                     huobi_config.symbols_path.clone()
                 } else {
                     panic!("No huobi config found, but was requested");
                 };
 
-                self.scan_from_csv(ExchangeObserverKind::Huobi, symbols_path, f)
+                self.scan_from_csv(ExchangeKind::Huobi, symbols_path, f)
                     .await;
             }
-            &ExchangeObserverKind::Kraken => {
+            &ExchangeKind::Kraken => {
                 let symbols_path = if let Some(kraken_config) = &self.config.kraken {
                     kraken_config.symbols_path.clone()
                 } else {
                     panic!("No kraken config found, but was requested");
                 };
 
-                self.scan_from_csv(ExchangeObserverKind::Kraken, symbols_path, f)
+                self.scan_from_csv(ExchangeKind::Kraken, symbols_path, f)
                     .await;
             }
             _ => todo!("Please implement us!!! (handlers for other observers)"),
