@@ -121,8 +121,8 @@ where
     }
 
     fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Self::Values>>) {
+        info!("Adding {} to Huobi watching symbols", &symbol);
         self.driver.add_price_to_monitor(symbol, price);
-        info!("Added {} to the watching symbols", &symbol);
     }
 
     fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
@@ -139,6 +139,7 @@ where
     }
 
     fn remove_symbol(&mut self, symbol: Symbol) {
+        info!("Removing symbol {} from Huobi observer", symbol);
         self.driver.remove_symbol(symbol);
     }
 

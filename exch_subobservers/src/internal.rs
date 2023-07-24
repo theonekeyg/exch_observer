@@ -2,7 +2,6 @@ use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
     PairedExchangeSymbol, SwapOrder, USD_STABLES,
 };
-use log::debug;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -288,7 +287,6 @@ where
         }
 
         self.threads_data_mapping.remove(&symbol);
-        debug!("Removed symbol {} from Binace observer", symbol);
     }
 
     pub fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
