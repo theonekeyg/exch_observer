@@ -361,7 +361,7 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
 /// Trait to represent a type of a current price on the exchange
 pub trait ExchangeValues {
     /// Values that the price is represented with
-    type Values = (f64, f64);
+    type Values;
 
     /// Updates the price with the new values
     fn update_price(&mut self, price: Self::Values);
