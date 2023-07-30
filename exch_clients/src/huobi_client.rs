@@ -178,7 +178,7 @@ where
             if balance > 0.0 {
                 match currency.type_field.as_str() {
                     "trade" => {
-                        if let Some(mut balance_data) = rv.get_mut(currency.currency.as_str()) {
+                        if let Some(balance_data) = rv.get_mut(currency.currency.as_str()) {
                             balance_data.free = balance_data.free + balance;
                         } else {
                             let asset = currency.currency.clone();

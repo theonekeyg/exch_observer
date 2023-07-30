@@ -1,4 +1,3 @@
-#![feature(get_mut_unchecked)]
 pub mod binance_obs;
 pub mod combined_obs;
 pub mod huobi_obs;

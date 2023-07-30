@@ -140,16 +140,7 @@ where
     pub fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Impl::Values>>) {
         let _symbol = <Symbol as Into<String>>::into(symbol.clone());
         if !self.price_table.contains_key(&_symbol) {
-            // Since with this design it's impossible to modify external ExchangeValues from
-            // thread, we're not required to lock the whole HashMap, since each thread modifies
-            // it's own *ExchangeValue.
-            //
-            // Unfortunately unsafe is required to achieve that in modern Rust, as there are no
-            // other options to expose that logic to the compiler.
-            unsafe {
-                let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-                ptable_ptr.insert(_symbol.clone(), price);
-            }
+            self.price_table.insert(_symbol.clone(), price);
 
             if !self.connected_symbols.contains_key(symbol.base()) {
                 self.connected_symbols
@@ -281,19 +272,13 @@ where
 
                 // Only remove prices when all symbols are removed from the thread.
                 for symbol in data.requests_to_stop_map.keys() {
-                    // Remove symbol from `threads_data_mapping`
-
-                    // Remove symbol from `price_table` This code is unsafe, since it gets
-                    // mutable data directly from Arc. Although, this unsafe block should be
-                    // safe, since we stopped the thread before.
-                    unsafe {
-                        let ptable_ptr = Arc::get_mut_unchecked(&mut self.price_table);
-                        ptable_ptr.remove(&symbol.clone().into());
-                    }
+                    // Remove symbol from `price_table`.
+                    self.price_table.remove(&symbol.clone().into());
                 }
             }
         }
 
+        // Remove symbol from `threads_data_mapping`
         self.threads_data_mapping.remove(&symbol);
     }
 

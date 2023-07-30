@@ -5,7 +5,6 @@ use binance::{
 // use csv::{Reader, StringRecord};
 use log::{info, trace};
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,

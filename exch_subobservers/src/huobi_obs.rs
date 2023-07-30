@@ -6,7 +6,6 @@ use exch_observer_types::{
 };
 use log::{info, trace};
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     sync::{Arc, Mutex},
