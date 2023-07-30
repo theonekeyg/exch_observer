@@ -11,6 +11,7 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
+use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 #[allow(unused)]
@@ -60,8 +61,8 @@ where
 
     fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
-        price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
+        price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
@@ -97,7 +98,7 @@ where
             }
         });
         websock.connect_multiple_streams(ws_query_subs).unwrap();
-        websock.event_loop(&thread_data.is_running).unwrap();
+        websock.event_loop(&thread_data.lock().unwrap().is_running).unwrap();
     }
 }
 

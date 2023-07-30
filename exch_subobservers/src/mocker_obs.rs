@@ -10,6 +10,7 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
+use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 pub struct MockerObserver<Symbol>
@@ -49,8 +50,8 @@ where
 
     fn new_instance(
         _symbols: &Vec<Symbol>,
-        _price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        _thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
+        _price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        _thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         println!("new_instance()");
     }

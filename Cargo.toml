@@ -1,4 +1,5 @@
 [workspace]
+resolver = "1"
 members = [
   "exch_observer",
   "exch_observer_types",
@@ -25,6 +26,7 @@ base64 = "0.21.2"
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
 chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4.2.1", features = ["derive"] }
+dashmap = "5.5.0"
 csv = "1.2.1"
 dotenvy = "0.15.6"
 env_logger = "0.10.0"

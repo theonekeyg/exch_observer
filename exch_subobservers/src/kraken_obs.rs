@@ -14,6 +14,7 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
+use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
@@ -59,8 +60,8 @@ where
 
     fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
-        price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
+        price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
@@ -109,7 +110,7 @@ where
             .connect_multiple_streams(ws_query_subs)
             .expect("Failed connect streams");
         websock
-            .event_loop(&thread_data.is_running)
+            .event_loop(&thread_data.lock().unwrap().is_running)
             .expect("Failed event loop");
     }
 }
