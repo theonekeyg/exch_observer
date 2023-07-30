@@ -207,7 +207,7 @@ where
         self.driver.add_price_to_monitor(symbol, price);
     }
 
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Self::Values>>> {
         self.driver.get_price_from_table(symbol)
     }
 

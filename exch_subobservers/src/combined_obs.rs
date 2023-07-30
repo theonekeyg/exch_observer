@@ -241,7 +241,7 @@ where
         &self,
         kind: ExchangeKind,
         symbol: &Symbol,
-    ) -> Option<&Arc<Mutex<AskBidValues>>> {
+    ) -> Option<Arc<Mutex<AskBidValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_price_from_table(&symbol);
         }

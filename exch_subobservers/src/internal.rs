@@ -180,11 +180,11 @@ where
         }
     }
 
-    pub fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Impl::Values>>> {
+    pub fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Impl::Values>>> {
         let symbol = <Symbol as Into<String>>::into(symbol.clone());
 
         if let Some(inner) = self.price_table.get(&symbol) {
-            return Some(inner.value());
+            return Some(inner.value().clone());
         }
 
         None

@@ -81,7 +81,7 @@ where
         info!("Added {} to the watching symbols", &symbol);
     }
 
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Self::Values>>> {
         self.driver.get_price_from_table(symbol)
     }
 
