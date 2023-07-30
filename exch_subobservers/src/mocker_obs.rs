@@ -1,4 +1,5 @@
 use crate::internal::MulticonObserverDriver;
+use dashmap::DashMap;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ObserverWorkerThreadData, OrderedExchangeSymbol,
     PairedExchangeSymbol,
@@ -9,7 +10,6 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
-use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 pub struct MockerObserver<Symbol>

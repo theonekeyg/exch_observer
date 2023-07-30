@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
     PairedExchangeSymbol, SwapOrder, USD_STABLES,
@@ -9,7 +10,6 @@ use std::{
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
-use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 pub struct MulticonObserverDriver<Symbol, Impl>
@@ -56,8 +56,7 @@ where
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
-            )
-            + Send
+            ) + Send
             + Sync
             + 'static,
     >,
@@ -76,7 +75,7 @@ where
         + PairedExchangeSymbol
         + 'static,
     Impl: ExchangeObserver<Symbol>,
-    Impl::Values: Send + 'static
+    Impl::Values: Send + 'static,
 {
     pub fn new<F>(async_runner: Arc<Runtime>, symbols_queue_limit: usize, spawn_callback: F) -> Self
     where
@@ -84,8 +83,7 @@ where
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
-            )
-            + Send
+            ) + Send
             + Sync
             + 'static,
     {
@@ -105,7 +103,9 @@ where
 
     fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
-            let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(&self.symbols_in_queue)));
+            let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
+                &self.symbols_in_queue,
+            )));
 
             for sym in &self.symbols_in_queue {
                 self.threads_data_mapping
@@ -119,11 +119,7 @@ where
             // Spawn a new thread for the symbols in the queue
             self.async_runner.clone().spawn_blocking(move || {
                 // Run main blocking callback
-                (spawn_callback)(
-                    &symbols_in_queue,
-                    price_table.clone(),
-                    thread_data.clone(),
-                );
+                (spawn_callback)(&symbols_in_queue, price_table.clone(), thread_data.clone());
             });
 
             self.symbols_in_queue.clear();
@@ -247,11 +243,12 @@ where
         // Mark the symbol to be removed from the worker thread, so it's price won't be updated
         // and it shows the thread that one symbol is removed.
         {
-        // This unsafe statement is safe because the only fields from the
-        // ObserverWorkerThreadData struct other thread uses is AtomicBool. However this way we
-        // won't have to deal with locks in this communication between threads. As long as
-        // only AtomicBool in this structure is used in subthreads, this is thread-safe.
-            let mut data = self.threads_data_mapping
+            // This unsafe statement is safe because the only fields from the
+            // ObserverWorkerThreadData struct other thread uses is AtomicBool. However this way we
+            // won't have to deal with locks in this communication between threads. As long as
+            // only AtomicBool in this structure is used in subthreads, this is thread-safe.
+            let mut data = self
+                .threads_data_mapping
                 .get_mut(&symbol)
                 .expect("Failed to get thread data for symbol")
                 .lock()

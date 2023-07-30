@@ -50,22 +50,19 @@ where
         // Create binance client
         if let Some(conf) = &self.config.binance {
             let client = BinanceClient::new(conf.api_key.clone(), conf.api_secret.clone());
-            self.clients
-                .insert(ExchangeKind::Binance, Box::new(client));
+            self.clients.insert(ExchangeKind::Binance, Box::new(client));
         }
 
         // Create huobi client
         if let Some(conf) = &self.config.huobi {
             let client = HuobiClient::new(conf.api_key.clone(), conf.api_secret.clone());
-            self.clients
-                .insert(ExchangeKind::Huobi, Box::new(client));
+            self.clients.insert(ExchangeKind::Huobi, Box::new(client));
         }
 
         // Create kraken client
         if let Some(conf) = &self.config.kraken {
             let client = KrakenClient::new(conf.api_key.clone(), conf.api_secret.clone());
-            self.clients
-                .insert(ExchangeKind::Kraken, Box::new(client));
+            self.clients.insert(ExchangeKind::Kraken, Box::new(client));
         }
     }
 
@@ -79,11 +76,7 @@ where
     }
 
     /// Fetches the balance of the current logged in user
-    pub fn get_balance(
-        &self,
-        kind: ExchangeKind,
-        asset: &String,
-    ) -> Option<ExchangeBalance> {
+    pub fn get_balance(&self, kind: ExchangeKind, asset: &String) -> Option<ExchangeBalance> {
         if let Some(client) = self.clients.get(&kind) {
             client.get_balance(asset)
         } else {

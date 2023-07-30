@@ -1,4 +1,5 @@
 use crate::internal::MulticonObserverDriver;
+use dashmap::DashMap;
 use exch_apis::{common::WebsocketEvent, huobi_ws::HuobiWebsocket};
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
@@ -10,7 +11,6 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
-use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 #[allow(unused)]
@@ -97,7 +97,9 @@ where
             }
         });
         websock.connect_multiple_streams(ws_query_subs).unwrap();
-        websock.event_loop(&thread_data.lock().unwrap().is_running).unwrap();
+        websock
+            .event_loop(&thread_data.lock().unwrap().is_running)
+            .unwrap();
     }
 }
 

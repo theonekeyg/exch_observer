@@ -3,6 +3,7 @@ use binance::{
     websockets::{WebSockets, WebsocketEvent},
 };
 // use csv::{Reader, StringRecord};
+use dashmap::DashMap;
 use log::{info, trace};
 use std::{
     fmt::{Debug, Display},
@@ -12,7 +13,6 @@ use std::{
     vec::Vec,
 };
 use tokio::runtime::Runtime;
-use dashmap::DashMap;
 
 use crate::internal::MulticonObserverDriver;
 use exch_observer_types::{
@@ -177,7 +177,9 @@ where
         });
 
         websock.connect_multiple_streams(&ws_query_subs).unwrap();
-        websock.event_loop(&thread_data.lock().unwrap().is_running).unwrap();
+        websock
+            .event_loop(&thread_data.lock().unwrap().is_running)
+            .unwrap();
     }
 }
 

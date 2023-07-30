@@ -64,7 +64,7 @@ impl ExchObserver for GrpcObserver {
 
         // Get price from the observer
         let tmp_binding = observer.get_price(exchange, &symbol).unwrap();
-        let _price = tmp_binding.lock() .unwrap();
+        let _price = tmp_binding.lock().unwrap();
 
         // Format the price from the table for the RPC response
         let price = _price.showable_price();

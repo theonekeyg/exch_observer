@@ -1,4 +1,5 @@
 use crate::internal::MulticonObserverDriver;
+use dashmap::DashMap;
 use exch_apis::{
     common::{Result as WsResult, WebsocketEvent},
     kraken_ws::KrakenWebsocket,
@@ -13,7 +14,6 @@ use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
-use dashmap::DashMap;
 use tokio::runtime::Runtime;
 
 pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
