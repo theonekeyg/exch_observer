@@ -1,0 +1,17 @@
+name: "Build setup"
+description: "Installs necessary packages to build exch_observer"
+
+runs:
+  using: composite
+
+  steps:
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Enable caching
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v2
