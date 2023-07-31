@@ -361,7 +361,7 @@ impl<Symbol: Eq + Hash + Clone + PairedExchangeSymbol> OrderedExchangeSymbol<Sym
 /// Trait to represent a type of a current price on the exchange
 pub trait ExchangeValues {
     /// Values that the price is represented with
-    type Values = (f64, f64);
+    type Values;
 
     /// Updates the price with the new values
     fn update_price(&mut self, price: Self::Values);
@@ -534,7 +534,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Self::Values>>);
 
     /// Fetches price on certain symbol from the observer
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>>;
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Self::Values>>>;
 
     /// Initialize the runtime, if observer requires one
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;

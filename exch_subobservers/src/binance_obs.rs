@@ -3,9 +3,9 @@ use binance::{
     websockets::{WebSockets, WebsocketEvent},
 };
 // use csv::{Reader, StringRecord};
+use dashmap::DashMap;
 use log::{info, trace};
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,
@@ -124,8 +124,8 @@ where
     /// Launches the observer thread with the given symbols
     pub fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
-        price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
+        price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
         let ws_query_subs = symbols
@@ -177,7 +177,9 @@ where
         });
 
         websock.connect_multiple_streams(&ws_query_subs).unwrap();
-        websock.event_loop(&thread_data.is_running).unwrap();
+        websock
+            .event_loop(&thread_data.lock().unwrap().is_running)
+            .unwrap();
     }
 }
 
@@ -206,7 +208,7 @@ where
         self.driver.add_price_to_monitor(symbol, price);
     }
 
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Self::Values>>> {
         self.driver.get_price_from_table(symbol)
     }
 

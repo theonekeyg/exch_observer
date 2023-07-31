@@ -1,11 +1,11 @@
 use crate::internal::MulticonObserverDriver;
+use dashmap::DashMap;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ObserverWorkerThreadData, OrderedExchangeSymbol,
     PairedExchangeSymbol,
 };
 use log::info;
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     sync::{Arc, Mutex},
@@ -49,8 +49,8 @@ where
 
     fn new_instance(
         _symbols: &Vec<Symbol>,
-        _price_table: Arc<HashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        _thread_data: Arc<ObserverWorkerThreadData<Symbol>>,
+        _price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        _thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         println!("new_instance()");
     }
@@ -80,7 +80,7 @@ where
         info!("Added {} to the watching symbols", &symbol);
     }
 
-    fn get_price_from_table(&self, symbol: &Symbol) -> Option<&Arc<Mutex<Self::Values>>> {
+    fn get_price_from_table(&self, symbol: &Symbol) -> Option<Arc<Mutex<Self::Values>>> {
         self.driver.get_price_from_table(symbol)
     }
 

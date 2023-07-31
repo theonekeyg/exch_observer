@@ -4,7 +4,7 @@ use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeKind, ExchangeValues, OrderedExchangeSymbol,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
     PairedExchangeSymbol,
 };
 use std::{
@@ -35,8 +35,7 @@ where
         + 'static,
 {
     /// Internal map of observers, use CombinedObserver functions to access individual observers.
-    pub observers:
-        HashMap<ExchangeKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
+    pub observers: HashMap<ExchangeKind, Box<dyn ExchangeObserver<Symbol, Values = AskBidValues>>>,
     /// Flag indicating if the observer threads are running.
     pub is_running: bool,
     /// Configuration for the observer.
@@ -241,7 +240,7 @@ where
         &self,
         kind: ExchangeKind,
         symbol: &Symbol,
-    ) -> Option<&Arc<Mutex<AskBidValues>>> {
+    ) -> Option<Arc<Mutex<AskBidValues>>> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.get_price_from_table(&symbol);
         }
