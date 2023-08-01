@@ -1,0 +1,9 @@
+base,quiote,pair_name,min_price,base_precision,qty_step_size,price_tick_size,min_notional,min_qty
+eth,usdt,ethusdt,0.01,4,0.0001,0.01,10,0.001
+eth,btc,ethbtc,0.000001,4,0.0001,0.000001,0.0001,0.001
+sol,usdt,solusdt,0.0001,2,0.01,0.0001,10,0.01
+sol,btc,solbtc,0.00000001,2,0.01,0.00000001,0.0001,0.01
+bnb,usdt,bnbusdt,0.01,4,0.0001,0.01,10,0.0001
+dot,btc,dotbtc,0.00000001,4,0.0001,0.00000001,0.0001,0.01
+dot,usdt,dotusdt,0.0001,4,0.0001,0.0001,10,0.01
+btc,usdt,btcusdt,0.01,6,0.000001,0.01,10,0.0001

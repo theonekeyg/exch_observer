@@ -1,0 +1,20 @@
+num_threads = 16
+
+[rpc]
+port = 51011
+host = "0.0.0.0"
+
+[observer.binance]
+symbols_path = "/observer_config/binance_tokens.csv"
+allowed_symbols = [ "usdt", "busd", "cfx", "stx", "agix", "btc", "ltc", "xrp", "shib", "doge", "sol", "ada", "eth", "apt", "matic", "dot", "bnb" ]
+enable = true
+
+[observer.huobi]
+symbols_path = "/observer_config/huobi_tokens.csv"
+allowed_symbols = [ "usdt", "btc", "eth", "bnb", "sol", "dot" ]
+enable = true
+
+[observer.kraken]
+symbols_path = "/observer_config/kraken_tokens.csv"
+allowed_symbols = [ "USD", "EUR", "SOL", "JPY", "USDC", "ETH", "XBT", "MANA" ]
+enable = true

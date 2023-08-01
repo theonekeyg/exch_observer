@@ -1,0 +1,7 @@
+services:
+  observer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "51011:51011"
