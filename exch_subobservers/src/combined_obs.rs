@@ -1,4 +1,4 @@
-use crate::{BinanceObserver, HuobiObserver, KrakenObserver};
+use crate::{BinanceObserver, HuobiObserver, KrakenObserver, MockerObserver};
 use anyhow::Result;
 use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
@@ -42,6 +42,9 @@ where
     pub config: ObserverConfig,
     /// Tokio runtime for the observer.
     pub runtime: Option<Arc<Runtime>>,
+
+    /// Internal flag to also create mocker observer. Used for easier testing.
+    enable_mocker: bool,
 }
 
 impl<Symbol> CombinedObserver<Symbol>
@@ -64,6 +67,7 @@ where
             is_running: false,
             config: config,
             runtime: None,
+            enable_mocker: false,
         };
 
         rv
@@ -76,7 +80,15 @@ where
             is_running: false,
             config: config,
             runtime: Some(async_runtime),
+            enable_mocker: false,
         }
+    }
+
+    /// Function to additionally create mocker observer, used for easier testing.
+    /// Must be called before `create_observers`, if you wish to create mocker
+    /// observer.
+    pub fn enable_mocker(&mut self) {
+        self.enable_mocker = true;
     }
 
     /// Sets the tokio runtime for the observer.
@@ -116,6 +128,12 @@ where
                 self.observers
                     .insert(ExchangeKind::Kraken, Box::new(kraken_observer));
             }
+        }
+
+        if self.enable_mocker {
+            let mocker_observer = MockerObserver::new(runtime.clone());
+            self.observers
+                .insert(ExchangeKind::Mocker, Box::new(mocker_observer));
         }
 
         Ok(())

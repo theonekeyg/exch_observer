@@ -8,3 +8,4 @@ pub use binance_obs::BinanceObserver;
 pub use combined_obs::*;
 pub use huobi_obs::HuobiObserver;
 pub use kraken_obs::KrakenObserver;
+pub use mocker_obs::MockerObserver;

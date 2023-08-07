@@ -569,6 +569,7 @@ pub enum ExchangeKind {
     Okex,
     Poloniex,
     Uniswap,
+    Mocker,
     Unknown,
 }
 
@@ -588,6 +589,7 @@ impl ExchangeKind {
             Self::Okex => "okex",
             Self::Poloniex => "poloniex",
             Self::Uniswap => "uniswap",
+            Self::Mocker => "mocker",
             Self::Unknown => "unknown",
         }
     }
