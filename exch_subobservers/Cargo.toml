@@ -7,15 +7,16 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-dashmap = { workspace = true }
-tokio = { workspace = true }
 binance = { workspace = true }
-log = { workspace = true }
 csv = { workspace = true }
+dashmap = { workspace = true }
 env_logger = { workspace = true }
-exch_observer_types = { workspace = true }
-exch_observer_derive = { workspace = true }
-exch_observer_config = { workspace = true }
-exch_clients = { workspace = true }
 exch_apis = { workspace = true }
+exch_clients = { workspace = true }
+exch_observer_config = { workspace = true }
+exch_observer_derive = { workspace = true }
+exch_observer_types = { workspace = true }
+log = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
 tungstenite = { workspace = true }
