@@ -3,6 +3,7 @@ use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
     PairedExchangeSymbol, SwapOrder, USD_STABLES,
 };
+use log::debug;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -130,7 +131,10 @@ where
         &self,
         symbol: &String,
     ) -> &'_ Vec<OrderedExchangeSymbol<Symbol>> {
-        &self.connected_symbols.get::<String>(symbol).unwrap()
+        &self
+            .connected_symbols
+            .get::<String>(symbol)
+            .expect("Symbol wasn't found")
     }
 
     pub fn add_price_to_monitor(&mut self, symbol: &Symbol, price: Arc<Mutex<Impl::Values>>) {
@@ -150,11 +154,11 @@ where
 
             self.connected_symbols
                 .get_mut(symbol.base())
-                .unwrap()
+                .expect("INTERNAL ERROR: Base symbol wasn't found")
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Sell));
             self.connected_symbols
                 .get_mut(symbol.quote())
-                .unwrap()
+                .expect("INTERNAL ERROR: Quote symbol wasn't found")
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
             self.symbols_in_queue.push(symbol.clone());
@@ -192,7 +196,7 @@ where
                     || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
                 {
                     return self.get_price_from_table(&ordered_sym.symbol).map(|v| {
-                        let unlocked = v.lock().unwrap();
+                        let unlocked = v.lock().expect("Failed to get mutex lock for price");
                         (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
                     });
                 }
@@ -215,16 +219,28 @@ where
         // symbols and `price_table`, also vote for this symbol's thread to stop (won't stop
         // untill all symbols related to this thread vote to stop it).
 
+        let mut found = false;
+
         // Remove from the `watching_symbols`
         for (i, sym) in self.watching_symbols.iter().enumerate() {
             if sym == &symbol {
                 self.watching_symbols.remove(i);
+                found = true;
                 break;
             }
         }
 
+        // If symbol is not loaded in the driver, simply return
+        if !found {
+            debug!("`remove_symbol` failed silently, since symbol wans't found in the driver");
+            return;
+        }
+
         // Remove from maptrees.
-        let base_connected = self.connected_symbols.get_mut(symbol.base()).unwrap();
+        let base_connected = self
+            .connected_symbols
+            .get_mut(symbol.base())
+            .expect("Failed to get base symbol");
         for (i, sym) in base_connected.iter().enumerate() {
             if sym.symbol == symbol {
                 base_connected.remove(i);
@@ -232,7 +248,10 @@ where
             }
         }
 
-        let quote_connected = self.connected_symbols.get_mut(symbol.quote()).unwrap();
+        let quote_connected = self
+            .connected_symbols
+            .get_mut(symbol.quote())
+            .expect("Failed to get quote symbol");
         for (i, sym) in quote_connected.iter().enumerate() {
             if sym.symbol == symbol {
                 quote_connected.remove(i);
@@ -255,7 +274,11 @@ where
                 .expect("Failed to lock thread data");
 
             // Check that the symbol is not already marked to be removed.
-            if !data.requests_to_stop_map.get(&symbol).unwrap() {
+            if !data
+                .requests_to_stop_map
+                .get(&symbol)
+                .expect("Failed to get symbol `requests_to_stop_map`")
+            {
                 data.requests_to_stop += 1;
                 data.requests_to_stop_map
                     .insert(symbol.clone(), true)
