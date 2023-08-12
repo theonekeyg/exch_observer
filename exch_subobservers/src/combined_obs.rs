@@ -4,14 +4,14 @@ use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol,
+    PairedExchangeSymbol, PriceUpdateEvent
 };
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     io,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
 };
 use tokio::runtime::Runtime;
 
@@ -91,6 +91,10 @@ where
     /// Sets the tokio runtime for the observer.
     pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
         self.runtime = Some(runtime);
+    }
+
+    pub fn get_supported_observers(&self) -> Vec<ExchangeKind> {
+        self.observers.keys().cloned().collect()
     }
 
     /// Creates observers for each exchange in the config, must be called before `load_symbols`.
@@ -317,5 +321,11 @@ where
         }
 
         None
+    }
+
+    pub fn set_tx_fifo(&mut self, kind: ExchangeKind, tx: mpsc::Sender<PriceUpdateEvent>) {
+        if let Some(observer) = self.observers.get_mut(&kind) {
+            observer.set_tx_fifo(tx);
+        }
     }
 }

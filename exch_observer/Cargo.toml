@@ -15,3 +15,4 @@ exch_observer_config = { workspace = true }
 exch_subobservers = { workspace = true }
 exch_clients = { workspace = true }
 exch_observer_rpc = { workspace = true }
+exch_observer_ws = { workspace = true }

@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-exch_subobservers = { workspace = true }
-exch_observer_types = { workspace = true }
 exch_observer_config = { workspace = true }
+exch_observer_types = { workspace = true }
+exch_subobservers = { workspace = true }
+log = { workspace = true }
+tungstenite = { workspace = true }

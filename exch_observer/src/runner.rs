@@ -5,6 +5,7 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcRunner;
 use exch_observer_types::ExchangeSymbol;
+use exch_observer_ws::ObserverWsRunner;
 use exch_subobservers::CombinedObserver;
 
 /// Main runner for the observer binary, contains the main observer and the
@@ -66,8 +67,25 @@ impl ObserverRunner {
             None
         };
 
+        let ws_handle = if let Some(ref ws_config) = self.config.ws {
+            let mut ws_observer = ObserverWsRunner::new(&self.main_observer, ws_config.clone());
+            Some(self.runtime.spawn(async move {
+                ws_observer.run().await;
+            }))
+        } else {
+            None
+        };
+
+        // Start WS service if configured
+
         // Block main thread until all services are done
         self.runtime.block_on(async {
+
+            if let Some(ws_handle) = ws_handle {
+                info!("Awaiting ws handle");
+                ws_handle.await.unwrap();
+            }
+
             if let Some(rpc_handle) = rpc_handle {
                 info!("Awaiting rpc handle");
                 rpc_handle.await.unwrap();
