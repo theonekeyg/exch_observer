@@ -37,7 +37,7 @@ impl ObserverWrapper {
     pub fn add_price_to_monitor(&mut self, symbol: &ExchangeSymbol, price: Arc<Mutex<AskBidValues>>) {
         match self {
             ObserverWrapper::Combined(combined) => {
-                combined.add_price_to_monitor(symbol, price);
+                combined.add_price_to_monitor(ExchangeKind::Mocker, symbol, price);
             },
             ObserverWrapper::Mocker(mocker) => {
                 mocker.add_price_to_monitor(symbol, price);
@@ -137,7 +137,7 @@ fn observer_tester_impl(
 
 #[test]
 fn test_mocker_observer_direct() {
-    let mut mocker = MockerObserver::new(Arc::new(get_runtime()));
+    let mocker = MockerObserver::new(Arc::new(get_runtime()));
 
     // Create initial symbols to test,
     // note that uniusdt will be removed, note that for
@@ -185,6 +185,6 @@ fn test_mocker_observer_direct() {
     );
 }
 
-#[test]
-fn test_mocker_observer_through_combined() {
-}
+// #[test]
+// fn test_mocker_observer_through_combined() {
+// }
