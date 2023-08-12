@@ -328,4 +328,12 @@ where
             observer.set_tx_fifo(tx);
         }
     }
+
+    pub fn dump_price_table(&self, kind: ExchangeKind) -> HashMap<String, AskBidValues> {
+        if let Some(observer) = self.observers.get(&kind) {
+            return observer.dump_price_table();
+        }
+
+        HashMap::new()
+    }
 }

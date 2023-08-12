@@ -79,7 +79,7 @@ where
         + PairedExchangeSymbol
         + 'static,
     Impl: ExchangeObserver<Symbol>,
-    Impl::Values: Send + 'static,
+    Impl::Values: Send + Copy + 'static,
 {
     pub fn new<F>(async_runner: Arc<Runtime>, symbols_queue_limit: usize, spawn_callback: F) -> Self
     where
@@ -323,8 +323,8 @@ where
         let mut price_table: HashMap<String, Impl::Values> = HashMap::with_capacity(self.price_table.len());
 
         for element in self.price_table.iter() {
-            let value = element.value().lock().expect("Failed to receive Mutex").deref();
-            price_table.insert(element.key().clone(), *value);
+            let value = *element.value().lock().expect("Failed to receive Mutex").deref();
+            price_table.insert(element.key().clone(), value);
         }
 
         price_table

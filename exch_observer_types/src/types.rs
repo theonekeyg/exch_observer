@@ -451,7 +451,7 @@ impl ExchangeValues for ExchangeSingleValues {
 /// Structure to store a price as a pair of values (ask/bid).
 /// Value it stores is best ask/bid price currently in the exchange pair.
 /// This structure is used by default in all observers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AskBidValues {
     pub ask_price: f64,
     pub bid_price: f64,

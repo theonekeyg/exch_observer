@@ -87,6 +87,13 @@ impl ObserverWsRunner
 
     fn handle_new_ws_connection(&mut self, stream: TcpStream) {
         let ws_stream = tungstenite::accept(stream).expect("Failed to accept ws connection");
+
+        let prices_dump = self.observer.read().expect("Failed to lock RWLock for reading").dump_price_table(ExchangeKind::Binance);
+
+        let msg_text = serde_json::to_string(&prices_dump).unwrap();
+        let msg = WsMessage::Text(msg_text);
+
+        ws_stream.send(msg).unwrap();
     }
 
     /*
