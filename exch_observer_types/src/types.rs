@@ -556,7 +556,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 }
 
 /// Enum to represent an exchange type
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum ExchangeKind {
     Binance,
     Bitfinex,
@@ -704,11 +704,22 @@ impl Into<ExchangeBalance> for BinanceBalance {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 /// Price update event, must be sent to receiver when price is updated
-pub struct PriceUpdateEvent<Symbol: Eq + Hash> {
+pub struct PriceUpdateEvent {
     pub exchange: ExchangeKind,
-    pub symbol: Symbol,
+    pub symbol: String,
     pub price: f64,
+}
+
+impl PriceUpdateEvent {
+    pub fn new(exchange: ExchangeKind, symbol: String, price: f64) -> Self {
+        Self {
+            exchange: exchange,
+            symbol: symbol,
+            price: price,
+        }
+    }
 }
 
 /// Internal data structure for the observer worker threads.
@@ -722,9 +733,9 @@ pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
     /// Requests map to stop this thread, happens when all symbols are stopped
     pub requests_to_stop_map: HashMap<Symbol, bool>,
     /// Atomic bool to check if thread is running
-    pub is_running: AtomicBool,
+    pub is_running: Arc<AtomicBool>,
     /// Sender to send update prices
-    pub tx: Option<mpsc::Sender<PriceUpdateEvent<Symbol>>>,
+    pub tx: Option<mpsc::Sender<PriceUpdateEvent>>,
     /// Handle to the tokio task
     pub handle: Option<JoinHandle<()>>,
 }
@@ -742,7 +753,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             length: length,
             requests_to_stop: 0,
             requests_to_stop_map: symbols_map,
-            is_running: AtomicBool::new(true),
+            is_running: Arc::new(AtomicBool::new(true)),
             tx: None,
             handle: None,
         }
@@ -766,12 +777,12 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
     }
 
     /// Set the tx channel to send price updates
-    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
         self.tx = Some(tx);
     }
 
     /// Send update price event to the tx channel if it exists
-    pub fn upate_price_event(&mut self, event: PriceUpdateEvent<Symbol>) {
+    pub fn upate_price_event(&mut self, event: PriceUpdateEvent) {
         if let Some(tx) = &self.tx {
             tx.send(event).unwrap();
         }

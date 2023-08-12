@@ -1,6 +1,5 @@
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver, MockerObserver};
 use anyhow::Result;
-use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
@@ -29,7 +28,6 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Into<String>
-        + From<BSymbol>
         + Send
         + Sync
         + 'static,
@@ -57,7 +55,6 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Send
-        + From<BSymbol>
         + Sync
         + 'static,
 {

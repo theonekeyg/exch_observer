@@ -1,5 +1,4 @@
 use binance::{
-    model::Symbol as BSymbol,
     websockets::{WebSockets, WebsocketEvent},
 };
 // use csv::{Reader, StringRecord};
@@ -17,7 +16,7 @@ use tokio::runtime::Runtime;
 use crate::internal::MulticonObserverDriver;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol,
+    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent, ExchangeKind
 };
 
 #[allow(unused)]
@@ -95,7 +94,6 @@ where
         + Send
         + Sync
         + PairedExchangeSymbol
-        + From<BSymbol>
         + 'static,
 {
     driver: MulticonObserverDriver<Symbol, Self>,
@@ -111,7 +109,6 @@ where
         + Into<String>
         + Send
         + Sync
-        + From<BSymbol>
         + PairedExchangeSymbol
         + 'static,
 {
@@ -136,6 +133,7 @@ where
             })
             .collect::<Vec<_>>();
 
+        let thread_data_clone = thread_data.clone();
         let mut websock = WebSockets::new(move |event: WebsocketEvent| {
             match event {
                 WebsocketEvent::OrderBook(order_book) => {
@@ -170,6 +168,16 @@ where
                         .unwrap()
                         .update_price((price_high, price_low));
                     trace!("[{}] Price: {:?}", kline.symbol, price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    thread_data.upate_price_event(
+                        PriceUpdateEvent::new(
+                            ExchangeKind::Binance,
+                            sym_index,
+                            price,
+                        )
+                    );
                 }
                 _ => (),
             }
@@ -177,8 +185,12 @@ where
         });
 
         websock.connect_multiple_streams(&ws_query_subs).unwrap();
+        let is_running = {
+            let thread_data = thread_data_clone.lock().unwrap();
+            thread_data.is_running.clone()
+        };
         websock
-            .event_loop(&thread_data.lock().unwrap().is_running)
+            .event_loop(&is_running)
             .unwrap();
     }
 }
@@ -194,7 +206,6 @@ where
         + PairedExchangeSymbol
         + Send
         + Sync
-        + From<BSymbol>
         + 'static,
 {
     type Values = AskBidValues;
