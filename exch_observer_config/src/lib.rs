@@ -48,6 +48,22 @@ impl Default for RpcConfig {
     }
 }
 
+/// Struct for configuring the WS server.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WsConfig {
+    pub port: Option<u16>,
+    pub host: Option<String>,
+}
+
+impl Default for WsConfig {
+    fn default() -> Self {
+        Self {
+            port: Some(51012),
+            host: Some("127.0.0.1".to_string()),
+        }
+    }
+}
+
 /// Struct representing the configuration for the observer,
 /// currently contains only the configuration for inner-observers.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -64,6 +80,7 @@ pub struct ExchObserverConfig {
     pub num_threads: Option<usize>,
     pub observer: ObserverConfig,
     pub rpc: Option<RpcConfig>,
+    pub ws: Option<WsConfig>,
 }
 
 impl ExchObserverConfig {
@@ -72,6 +89,7 @@ impl ExchObserverConfig {
             num_threads: None,
             observer: ObserverConfig::default(),
             rpc: None,
+            ws: None,
         }
     }
 
@@ -87,6 +105,10 @@ impl ExchObserverConfig {
 
         if config.rpc.is_none() {
             config.rpc = Some(RpcConfig::default());
+        }
+
+        if config.ws.is_none() {
+            config.ws = Some(WsConfig::default());
         }
 
         Ok(config)

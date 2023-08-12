@@ -8,6 +8,7 @@ members = [
   "exch_observer_utils",
   "exch_observer_derive",
   "exch_observer_rpc",
+  "exch_observer_ws",
   "exch_observer_dbg",
   "exch_clients",
   "exch_apis",
@@ -38,6 +39,7 @@ exch_observer_config = { path = "exch_observer_config" }
 exch_observer_dbg = { path = "exch_observer_dbg" }
 exch_observer_derive = { path = "exch_observer_derive" }
 exch_observer_rpc = { path = "exch_observer_rpc" }
+exch_observer_ws = { path = "exch_observer_ws" }
 exch_observer_types = { path = "exch_observer_types" }
 exch_observer_utils = { path = "exch_observer_utils" }
 exch_subobservers = { path = "exch_subobservers" }
