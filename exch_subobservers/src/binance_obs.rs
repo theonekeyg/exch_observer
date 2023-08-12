@@ -5,6 +5,7 @@ use binance::{
 use dashmap::DashMap;
 use log::{info, trace};
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,
@@ -243,5 +244,9 @@ where
 
     fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
         self.driver.set_tx_fifo(tx);
+    }
+
+    fn dump_price_table(&self) -> HashMap<String, Self::Values> {
+        self.driver.dump_price_table()
     }
 }

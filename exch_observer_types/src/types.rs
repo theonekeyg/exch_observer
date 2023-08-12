@@ -556,6 +556,10 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 
     /// Function to set tx sender to send messages on price updates from observer.
     fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>);
+
+    /// Function to dump the existing prices into a newly created HashMap. Pretty expensive
+    /// function to call.
+    fn dump_price_table(&self) -> HashMap<String, Self::Values>;
 }
 
 /// Enum to represent an exchange type

@@ -10,6 +10,7 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     sync::{Arc, Mutex, mpsc},
+    ops::Deref
 };
 use tokio::runtime::Runtime;
 
@@ -317,4 +318,15 @@ where
         }
     }
 
+    /// Function to dump the existing prices into a newly created HashMap.
+    pub fn dump_price_table(&self) -> HashMap<String, Impl::Values> {
+        let mut price_table: HashMap<String, Impl::Values> = HashMap::with_capacity(self.price_table.len());
+
+        for element in self.price_table.iter() {
+            let value = element.value().lock().expect("Failed to receive Mutex").deref();
+            price_table.insert(element.key().clone(), *value);
+        }
+
+        price_table
+    }
 }

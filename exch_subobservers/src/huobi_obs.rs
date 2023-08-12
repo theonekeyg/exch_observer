@@ -7,6 +7,7 @@ use exch_observer_types::{
 };
 use log::{info, trace};
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     sync::{Arc, Mutex, mpsc},
@@ -151,5 +152,9 @@ where
 
     fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
         self.driver.set_tx_fifo(tx);
+    }
+
+    fn dump_price_table(&self) -> HashMap<String, Self::Values> {
+        self.driver.dump_price_table()
     }
 }
