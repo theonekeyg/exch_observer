@@ -16,6 +16,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        mpsc,
     },
 };
 use tokio::task::JoinHandle;
@@ -703,14 +704,28 @@ impl Into<ExchangeBalance> for BinanceBalance {
     }
 }
 
+/// Price update event, must be sent to receiver when price is updated
+pub struct PriceUpdateEvent<Symbol: Eq + Hash> {
+    pub exchange: ExchangeKind,
+    pub symbol: Symbol,
+    pub price: f64,
+}
+
 /// Internal data structure for the observer worker threads.
 /// Used to implement voting mechanism for symbols to stop their threads,
 /// this mechanism allowes threads to monitor multiple symbols at once
 pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
+    /// Amount of symbols that this thread is monitoring
     pub length: usize,
+    /// Amount of requests to stop this thread, happens when all symbols are stopped
     pub requests_to_stop: usize,
+    /// Requests map to stop this thread, happens when all symbols are stopped
     pub requests_to_stop_map: HashMap<Symbol, bool>,
+    /// Atomic bool to check if thread is running
     pub is_running: AtomicBool,
+    /// Sender to send update prices
+    pub tx: Option<mpsc::Sender<PriceUpdateEvent<Symbol>>>,
+    /// Handle to the tokio task
     pub handle: Option<JoinHandle<()>>,
 }
 
@@ -728,6 +743,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             requests_to_stop: 0,
             requests_to_stop_map: symbols_map,
             is_running: AtomicBool::new(true),
+            tx: None,
             handle: None,
         }
     }
@@ -747,5 +763,17 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             .iter()
             .filter(|(_, &is_running)| is_running)
             .map(|(symbol, _)| symbol)
+    }
+
+    /// Set the tx channel to send price updates
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
+        self.tx = Some(tx);
+    }
+
+    /// Send update price event to the tx channel if it exists
+    pub fn upate_price_event(&mut self, event: PriceUpdateEvent<Symbol>) {
+        if let Some(tx) = &self.tx {
+            tx.send(event).unwrap();
+        }
     }
 }

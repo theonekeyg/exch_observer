@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder, USD_STABLES,
+    PairedExchangeSymbol, SwapOrder, USD_STABLES, PriceUpdateEvent
 };
 use log::debug;
 use std::{
@@ -9,7 +9,7 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
 };
 use tokio::runtime::Runtime;
 
@@ -43,6 +43,8 @@ where
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    /// Vector of unique threads that are currently running.
+    threads_data_vec: Vec<Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -95,10 +97,18 @@ where
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
+            threads_data_vec: vec![],
             symbols_in_queue: vec![],
             symbols_queue_limit: symbols_queue_limit,
             marker: PhantomData,
             spawn_callback: Arc::new(spawn_callback),
+        }
+    }
+
+    /// Sets tx price-update fifo for all running threads
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
+        for thread_data in &self.threads_data_vec {
+            thread_data.lock().unwrap().set_tx_fifo(tx.clone());
         }
     }
 
