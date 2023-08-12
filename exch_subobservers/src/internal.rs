@@ -105,13 +105,6 @@ where
         }
     }
 
-    /// Sets tx price-update fifo for all running threads
-    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
-        for thread_data in &self.threads_data_vec {
-            thread_data.lock().unwrap().set_tx_fifo(tx.clone());
-        }
-    }
-
     fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
             let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
@@ -315,4 +308,13 @@ where
     pub fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         return &self.watching_symbols;
     }
+
+    /// Sets tx price-update fifo for all running threads
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        // Set tx fifo for all running threads
+        for thread_data in &self.threads_data_vec {
+            thread_data.lock().unwrap().set_tx_fifo(tx.clone());
+        }
+    }
+
 }

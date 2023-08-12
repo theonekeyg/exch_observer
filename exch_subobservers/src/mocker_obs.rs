@@ -2,13 +2,13 @@ use crate::internal::MulticonObserverDriver;
 use dashmap::DashMap;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol,
+    PairedExchangeSymbol, PriceUpdateEvent
 };
 use log::info;
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
 };
 use tokio::runtime::Runtime;
 
@@ -99,5 +99,9 @@ where
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         self.driver.get_watching_symbols()
+    }
+
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.driver.set_tx_fifo(tx);
     }
 }

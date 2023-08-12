@@ -553,6 +553,9 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 
     /// Returns the reference to vector of symbols that are being watched
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
+
+    /// Function to set tx sender to send messages on price updates from observer.
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>);
 }
 
 /// Enum to represent an exchange type

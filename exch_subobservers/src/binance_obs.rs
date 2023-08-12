@@ -8,7 +8,7 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     vec::Vec,
 };
 use tokio::runtime::Runtime;
@@ -239,5 +239,9 @@ where
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         self.driver.get_watching_symbols()
+    }
+
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.driver.set_tx_fifo(tx);
     }
 }
