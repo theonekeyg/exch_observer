@@ -63,3 +63,4 @@ tonic = "0.9.1"
 tonic-build = "0.9.1"
 tungstenite = { version = "0.20.0", features = ["native-tls"] }
 url = "2.2.2"
+uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics"] }

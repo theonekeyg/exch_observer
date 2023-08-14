@@ -21,6 +21,25 @@ use tungstenite::{
 };
 use tokio::runtime::Runtime;
 use log::{info, debug};
+use uuid::Uuid;
+
+#[derive(Debug)]
+/// Structure that represents a unique client of a websocket server
+pub struct WsClient {
+    /// Unique identifier of the client
+    pub uuid: Uuid,
+    /// Websocket stream to the client
+    pub ws: WebSocket<TcpStream>,
+}
+
+impl WsClient {
+    pub fn new(uuid: Uuid, ws: WebSocket<TcpStream>) -> Self {
+        Self {
+            uuid: uuid,
+            ws: ws,
+        }
+    }
+}
 
 /// This struct serves as a main interface to exch_observer WS service.
 /// It sends the data about the prices to the connected WS clients.
@@ -36,7 +55,7 @@ pub struct ObserverWsRunner
     pub exchange_kind_to_rx: HashMap<ExchangeKind, mpsc::Receiver<PriceUpdateEvent>>,
 
     /// Map of exchange kind to websocket subscribers
-    pub subscribers: HashMap<ExchangeKind, Arc<Mutex<Vec<WebSocket<TcpStream>>>>>,
+    pub subscribers: HashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
 
     pub runtime: Arc<Runtime>,
 }
@@ -107,23 +126,32 @@ impl ObserverWsRunner
     fn rx_block_loop(
         kind: ExchangeKind,
         rx: mpsc::Receiver<PriceUpdateEvent>,
-        subscribers: Arc<Mutex<Vec<WebSocket<TcpStream>>>>
+        subscribers: Arc<Mutex<Vec<WsClient>>>
     ) {
         debug!("Starting rx_block_loop for {}", kind.to_str());
         loop {
             let event = rx.recv().unwrap();
-            debug!("New event: {:?}", event);
             let msg_text = serde_json::to_string(&event).unwrap();
             let msg = WsMessage::Text(msg_text);
 
-            for subscriber in subscribers.lock().expect("Failed to acquire mutex").iter_mut() {
-                match subscriber.send(msg.clone()) {
+            // Keep track of the subscribers that returned an error to remove them from internal
+            // list of subscribers later
+            let mut drop_indicies = vec![];
+            for (i, subscriber) in subscribers.lock().expect("Failed to acquire mutex").iter_mut().enumerate() {
+                match subscriber.ws.send(msg.clone()) {
                     Ok(_) => {},
                     Err(e) => {
-                        debug!("Closing connection to subscriber: {:?}", e);
-                        // Remove the subscriber from the list
+                        debug!("Closing connection to subscriber due to error: {:?}", e);
+                        drop_indicies.push(i);
                     }
                 }
+            }
+
+            // Remove the subscribers that returned an error
+            let mut i = 0;
+            for index in drop_indicies {
+                subscribers.lock().expect("Failed to acquire mutex").remove(index - i);
+                i += 1;
             }
         }
     }
@@ -138,11 +166,13 @@ impl ObserverWsRunner
 
         ws_stream.send(msg).unwrap();
 
+        let new_user = WsClient::new(Uuid::new_v4(), ws_stream);
+
         // Add websocket stream to the subscribers list
         if let Some(subscribers) = self.subscribers.get_mut(&ExchangeKind::Binance) {
-            subscribers.lock().expect("Failed to acquire lock").push(ws_stream);
+            subscribers.lock().expect("Failed to acquire lock").push(new_user);
         } else {
-            self.subscribers.insert(ExchangeKind::Binance, Arc::new(Mutex::new(vec![ws_stream])));
+            self.subscribers.insert(ExchangeKind::Binance, Arc::new(Mutex::new(vec![new_user])));
         }
     }
 }
