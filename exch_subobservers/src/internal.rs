@@ -38,6 +38,8 @@ where
     /// map from already concatenated pair names, when turning concatenated string into
     /// ExchangeSymbol is impossible.
     price_table: Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+    /// Internal mapping of symbol string representation to the symbol itself.
+    str_symbol_mapping: Arc<DashMap<String, Symbol>>,
     async_runner: Arc<Runtime>,
 
     /// Necessary for getting control of the threads execution from a function.
@@ -59,6 +61,7 @@ where
         dyn Fn(
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+                Arc<DashMap<String, Symbol>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
             ) + Send
             + Sync
@@ -86,6 +89,7 @@ where
         F: Fn(
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+                Arc<DashMap<String, Symbol>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
             ) + Send
             + Sync
@@ -95,6 +99,7 @@ where
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(DashMap::new()),
+            str_symbol_mapping: Arc::new(DashMap::new()),
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
@@ -106,6 +111,9 @@ where
         }
     }
 
+    /// Spawns a new thread for the symbols in the queue. It clear the queue after spawning a
+    /// thread. It also doesn't perform checks for queue limit, simply spawns the thread for 
+    /// the current queue.
     fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
             let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
@@ -121,13 +129,15 @@ where
             let spawn_callback = self.spawn_callback.clone();
             let symbols_in_queue = self.symbols_in_queue.clone();
             let price_table = self.price_table.clone();
+            let str_symbol_mapping = self.str_symbol_mapping.clone();
 
             // Spawn a new thread for the symbols in the queue
             self.async_runner.clone().spawn_blocking(move || {
-                // Run main blocking callback
-                (spawn_callback)(&symbols_in_queue, price_table.clone(), thread_data.clone());
+                // Run blocking callback defined in end implementation
+                (spawn_callback)(&symbols_in_queue, price_table, str_symbol_mapping, thread_data);
             });
 
+            // Clear symbols queue
             self.symbols_in_queue.clear();
         }
     }
@@ -147,6 +157,7 @@ where
         if !self.price_table.contains_key(&_symbol) {
             self.price_table.insert(_symbol.clone(), price);
 
+            // The symbol could be added to the connected_symbolsk
             if !self.connected_symbols.contains_key(symbol.base()) {
                 self.connected_symbols
                     .insert(symbol.base().to_string().clone(), Vec::new());
@@ -157,6 +168,8 @@ where
                     .insert(symbol.quote().to_string().clone(), Vec::new());
             }
 
+            // Insert OrderedExchangeSymbol into the connected_symbols map for both
+            // base and quote tokens
             self.connected_symbols
                 .get_mut(symbol.base())
                 .expect("INTERNAL ERROR: Base symbol wasn't found")
@@ -166,12 +179,19 @@ where
                 .expect("INTERNAL ERROR: Quote symbol wasn't found")
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
+            // Add symbol to `str_symbol_mapping`
+            self.str_symbol_mapping
+                .insert(_symbol.clone(), symbol.clone());
+
+            // Insert symbol into the symbol queue
             self.symbols_in_queue.push(symbol.clone());
 
+            // If the queue limit is reached, spawn a new thread for the symbols in the queue
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
                 self.spawn_tasks_for_queue_symbols();
             }
 
+            // Add new symbol to watching symbols
             self.watching_symbols.push(symbol.clone())
         }
     }

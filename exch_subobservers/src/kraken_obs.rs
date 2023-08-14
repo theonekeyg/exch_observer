@@ -61,6 +61,7 @@ where
     fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
         price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        _str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");

@@ -715,12 +715,12 @@ impl Into<ExchangeBalance> for BinanceBalance {
 /// Price update event, must be sent to receiver when price is updated
 pub struct PriceUpdateEvent {
     pub exchange: ExchangeKind,
-    pub symbol: String,
-    pub price: f64,
+    pub symbol: ExchangeSymbol,
+    pub price: AskBidValues,
 }
 
 impl PriceUpdateEvent {
-    pub fn new(exchange: ExchangeKind, symbol: String, price: f64) -> Self {
+    pub fn new(exchange: ExchangeKind, symbol: ExchangeSymbol, price: AskBidValues) -> Self {
         Self {
             exchange: exchange,
             symbol: symbol,

@@ -51,6 +51,7 @@ where
     fn new_instance(
         _symbols: &Vec<Symbol>,
         _price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        _str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         _thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         println!("new_instance()");
