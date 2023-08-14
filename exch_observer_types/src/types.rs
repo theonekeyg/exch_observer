@@ -789,7 +789,7 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
     }
 
     /// Send update price event to the tx channel if it exists
-    pub fn upate_price_event(&mut self, event: PriceUpdateEvent) {
+    pub fn update_price_event(&mut self, event: PriceUpdateEvent) {
         if let Some(tx) = &self.tx {
             tx.send(event).unwrap();
         }

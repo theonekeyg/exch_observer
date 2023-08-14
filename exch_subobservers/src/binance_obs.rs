@@ -153,6 +153,16 @@ where
                         .unwrap()
                         .update_price((ask_price, bid_price));
                     trace!("[{}] Price: {:?}", book.symbol, price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    thread_data.update_price_event(
+                        PriceUpdateEvent::new(
+                            ExchangeKind::Binance,
+                            sym_index,
+                            price,
+                        )
+                    );
                 }
                 WebsocketEvent::Kline(kline) => {
                     let kline = kline.kline;
@@ -172,7 +182,7 @@ where
 
                     // Send price update events to the thread_data tx channel
                     let mut thread_data = thread_data.lock().unwrap();
-                    thread_data.upate_price_event(
+                    thread_data.update_price_event(
                         PriceUpdateEvent::new(
                             ExchangeKind::Binance,
                             sym_index,

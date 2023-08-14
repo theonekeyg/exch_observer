@@ -116,6 +116,7 @@ where
                 self.threads_data_mapping
                     .insert(sym.clone(), thread_data.clone());
             }
+            self.threads_data_vec.push(thread_data.clone());
 
             let spawn_callback = self.spawn_callback.clone();
             let symbols_in_queue = self.symbols_in_queue.clone();
