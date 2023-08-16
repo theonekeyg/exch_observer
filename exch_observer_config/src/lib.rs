@@ -10,6 +10,8 @@ pub struct KrakenConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
 }
 
 /// Struct representing the configuration for the Binance observer
@@ -20,6 +22,8 @@ pub struct BinanceConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
 }
 
 /// Struct representing the configuration for the Huobi observer
@@ -30,6 +34,8 @@ pub struct HuobiConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
 }
 
 /// Struct for configuring the RPC server/client
@@ -51,14 +57,12 @@ impl Default for RpcConfig {
 /// Struct for configuring the WS server.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsConfig {
-    pub port: Option<u16>,
     pub host: Option<String>,
 }
 
 impl Default for WsConfig {
     fn default() -> Self {
         Self {
-            port: Some(51012),
             host: Some("127.0.0.1".to_string()),
         }
     }

@@ -68,7 +68,13 @@ impl ObserverRunner {
         };
 
         let ws_handle = if let Some(ref ws_config) = self.config.ws {
-            let mut ws_observer = ObserverWsRunner::new(&self.main_observer, self.runtime.clone(), ws_config.clone());
+            let mut ws_observer = ObserverWsRunner::new(
+                &self.main_observer,
+                self.runtime.clone(),
+                ws_config.clone(),
+                self.config.observer.clone()
+            );
+
             Some(self.runtime.spawn(async move {
                 ws_observer.run().await;
             }))
