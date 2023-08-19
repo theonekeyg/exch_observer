@@ -3,7 +3,8 @@ use dashmap::DashMap;
 use exch_apis::{common::WebsocketEvent, huobi_ws::HuobiWebsocket};
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent
+    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent, ExchangeKind,
+    ExchangeSymbol
 };
 use log::{info, trace};
 use std::{
@@ -62,7 +63,7 @@ where
     fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
         price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
-        _str_symbol_mapping: Arc<DashMap<String, Symbol>>,
+        str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
@@ -73,18 +74,21 @@ where
                 book_ticker_stream(&sym)
             })
             .collect::<Vec<_>>();
+
+        let thread_data_clone = thread_data.clone();
         let mut websock = HuobiWebsocket::new(move |event: WebsocketEvent| match event {
             WebsocketEvent::KLineEvent(kline) => {
-                let price_high = kline.high;
-                let price_low = kline.low;
-                let price = (price_high + price_low) / 2.0;
+                let ask_price = kline.high;
+                let bid_price = kline.low;
                 let sym_index = kline.sym.clone().to_ascii_lowercase();
                 let update_value = price_table.get(&sym_index).unwrap();
+
                 update_value
                     .lock()
                     .unwrap()
-                    .update_price((price_high, price_low));
-                trace!("[{}] Price: {:?}", sym_index, price);
+                    .update_price((ask_price, bid_price));
+
+                trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
             }
             WebsocketEvent::BookTickerEvent(book) => {
                 let ask_price = book.best_ask;
@@ -96,11 +100,29 @@ where
                     .unwrap()
                     .update_price((ask_price, bid_price));
                 trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+
+                // Send price update events to the thread_data tx channel
+                let mut thread_data = thread_data.lock().unwrap();
+                let symbol = str_symbol_mapping
+                    .get(&sym_index)
+                    .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                    .clone();
+                thread_data.update_price_event(
+                    PriceUpdateEvent::new(
+                        ExchangeKind::Huobi,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    )
+                );
             }
         });
         websock.connect_multiple_streams(ws_query_subs).unwrap();
+        let is_running = {
+            let thread_data = thread_data_clone.lock().unwrap();
+            thread_data.is_running.clone()
+        };
         websock
-            .event_loop(&thread_data.lock().unwrap().is_running)
+            .event_loop(&is_running)
             .unwrap();
     }
 }
