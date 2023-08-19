@@ -558,7 +558,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 
     /// Function to dump the existing prices into a newly created HashMap. Pretty expensive
     /// function to call.
-    fn dump_price_table(&self) -> HashMap<String, Self::Values>;
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values>;
 }
 
 /// Enum to represent an exchange type
@@ -710,7 +710,7 @@ impl Into<ExchangeBalance> for BinanceBalance {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Price update event, must be sent to receiver when price is updated
 pub struct PriceUpdateEvent {
     pub exchange: ExchangeKind,
