@@ -357,7 +357,7 @@ where
         }
     }
 
-    pub fn dump_price_table(&self, kind: ExchangeKind) -> HashMap<String, AskBidValues> {
+    pub fn dump_price_table(&self, kind: ExchangeKind) -> HashMap<Symbol, AskBidValues> {
         if let Some(observer) = self.observers.get(&kind) {
             return observer.dump_price_table();
         }

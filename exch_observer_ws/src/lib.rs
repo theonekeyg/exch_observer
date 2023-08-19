@@ -105,11 +105,20 @@ impl ObserverWsDriver {
     ) {
         let mut ws_stream = tungstenite::accept(stream).expect("Failed to accept ws connection");
 
+        // At the start of the connection send the current state of the price table.
         let prices_dump = observer
             .read()
             .expect("Failed to lock RWLock for reading")
-            .dump_price_table(exchange.clone());
+            .dump_price_table(exchange.clone())
+            .iter()
+            .map(|(symbol, price)| PriceUpdateEvent {
+                exchange: exchange.clone(),
+                symbol: symbol.clone(),
+                price: price.clone(),
+            })
+            .collect::<Vec<PriceUpdateEvent>>();
 
+        // Serialize the prices dump and send it to the client
         let msg_text = serde_json::to_string(&prices_dump).unwrap();
         let msg = WsMessage::Text(msg_text);
 
@@ -128,6 +137,8 @@ impl ObserverWsDriver {
         }
     }
 
+    /// This functions spawns new websocket server for `exchange` on `port` and starts publishing
+    /// updates to its subscribers.
     pub fn spawn_new_server(
         &mut self,
         host: &String,

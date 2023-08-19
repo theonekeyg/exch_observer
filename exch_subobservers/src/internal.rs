@@ -345,8 +345,8 @@ where
     }
 
     /// Function to dump the existing prices into a newly created HashMap.
-    pub fn dump_price_table(&self) -> HashMap<String, Impl::Values> {
-        let mut price_table: HashMap<String, Impl::Values> =
+    pub fn dump_price_table(&self) -> HashMap<Symbol, Impl::Values> {
+        let mut price_table: HashMap<Symbol, Impl::Values> =
             HashMap::with_capacity(self.price_table.len());
 
         for element in self.price_table.iter() {
@@ -355,7 +355,13 @@ where
                 .lock()
                 .expect("Failed to receive Mutex")
                 .deref();
-            price_table.insert(element.key().clone(), value);
+            let key = element.key().clone();
+            let symbol = self
+                .str_symbol_mapping
+                .get(&key)
+                .unwrap();
+
+            price_table.insert(symbol.clone(), value);
         }
 
         price_table

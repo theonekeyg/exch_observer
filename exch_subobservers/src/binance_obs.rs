@@ -262,7 +262,7 @@ where
         self.driver.set_tx_fifo(tx);
     }
 
-    fn dump_price_table(&self) -> HashMap<String, Self::Values> {
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values> {
         self.driver.dump_price_table()
     }
 }
