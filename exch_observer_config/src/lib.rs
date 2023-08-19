@@ -14,6 +14,17 @@ pub struct KrakenConfig {
     pub ws_port: u16,
 }
 
+impl KrakenConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51015,
+        }
+    }
+}
+
 /// Struct representing the configuration for the Binance observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct BinanceConfig {
@@ -26,6 +37,17 @@ pub struct BinanceConfig {
     pub ws_port: u16,
 }
 
+impl BinanceConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51013,
+        }
+    }
+}
+
 /// Struct representing the configuration for the Huobi observer
 #[derive(Debug, Clone, Deserialize)]
 pub struct HuobiConfig {
@@ -36,6 +58,17 @@ pub struct HuobiConfig {
     pub enable: bool,
     /// Port for the WS server
     pub ws_port: u16,
+}
+
+impl HuobiConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51014,
+        }
+    }
 }
 
 /// Struct for configuring the RPC server/client
