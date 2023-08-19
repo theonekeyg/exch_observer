@@ -15,8 +15,7 @@ use std::{
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-        mpsc,
+        mpsc, Arc, Mutex,
     },
 };
 use tokio::task::JoinHandle;

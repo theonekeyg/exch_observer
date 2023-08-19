@@ -2,16 +2,15 @@ use crate::internal::MulticonObserverDriver;
 use dashmap::DashMap;
 use exch_apis::{common::WebsocketEvent, huobi_ws::HuobiWebsocket};
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent, ExchangeKind,
-    ExchangeSymbol
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::{info, trace};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -105,15 +104,16 @@ where
                 let mut thread_data = thread_data.lock().unwrap();
                 let symbol = str_symbol_mapping
                     .get(&sym_index)
-                    .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                    .expect(&format!(
+                        "Symbol {} is not in the required mapping",
+                        sym_index
+                    ))
                     .clone();
-                thread_data.update_price_event(
-                    PriceUpdateEvent::new(
-                        ExchangeKind::Huobi,
-                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                        AskBidValues::new_with_prices(ask_price, bid_price),
-                    )
-                );
+                thread_data.update_price_event(PriceUpdateEvent::new(
+                    ExchangeKind::Huobi,
+                    ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                    AskBidValues::new_with_prices(ask_price, bid_price),
+                ));
             }
         });
         websock.connect_multiple_streams(ws_query_subs).unwrap();
@@ -121,9 +121,7 @@ where
             let thread_data = thread_data_clone.lock().unwrap();
             thread_data.is_running.clone()
         };
-        websock
-            .event_loop(&is_running)
-            .unwrap();
+        websock.event_loop(&is_running).unwrap();
     }
 }
 

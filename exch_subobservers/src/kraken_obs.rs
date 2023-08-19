@@ -5,16 +5,15 @@ use exch_apis::{
     kraken_ws::KrakenWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent, ExchangeKind,
-    ExchangeSymbol,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::{info, trace};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -97,15 +96,16 @@ where
                     let mut thread_data = thread_data.lock().unwrap();
                     let symbol = str_symbol_mapping
                         .get(&sym_index)
-                        .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
                         .clone();
-                    thread_data.update_price_event(
-                        PriceUpdateEvent::new(
-                            ExchangeKind::Kraken,
-                            ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                            AskBidValues::new_with_prices(ask_price, bid_price),
-                        )
-                    );
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Kraken,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 WebsocketEvent::BookTickerEvent(book) => {
                     let ask_price = book.best_ask;
@@ -125,15 +125,16 @@ where
                     let mut thread_data = thread_data.lock().unwrap();
                     let symbol = str_symbol_mapping
                         .get(&sym_index)
-                        .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
                         .clone();
-                    thread_data.update_price_event(
-                        PriceUpdateEvent::new(
-                            ExchangeKind::Kraken,
-                            ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                            AskBidValues::new_with_prices(ask_price, bid_price),
-                        )
-                    );
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Kraken,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
             }
 
@@ -148,9 +149,7 @@ where
             let thread_data = thread_data_clone.lock().unwrap();
             thread_data.is_running.clone()
         };
-        websock
-            .event_loop(&is_running)
-            .expect("Failed event loop");
+        websock.event_loop(&is_running).expect("Failed event loop");
     }
 }
 

@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder, USD_STABLES, PriceUpdateEvent
+    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES,
 };
 use log::debug;
 use std::{
@@ -9,8 +9,8 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    sync::{Arc, Mutex, mpsc},
-    ops::Deref
+    ops::Deref,
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -112,7 +112,7 @@ where
     }
 
     /// Spawns a new thread for the symbols in the queue. It clear the queue after spawning a
-    /// thread. It also doesn't perform checks for queue limit, simply spawns the thread for 
+    /// thread. It also doesn't perform checks for queue limit, simply spawns the thread for
     /// the current queue.
     fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
@@ -134,7 +134,12 @@ where
             // Spawn a new thread for the symbols in the queue
             self.async_runner.clone().spawn_blocking(move || {
                 // Run blocking callback defined in end implementation
-                (spawn_callback)(&symbols_in_queue, price_table, str_symbol_mapping, thread_data);
+                (spawn_callback)(
+                    &symbols_in_queue,
+                    price_table,
+                    str_symbol_mapping,
+                    thread_data,
+                );
             });
 
             // Clear symbols queue
@@ -341,10 +346,15 @@ where
 
     /// Function to dump the existing prices into a newly created HashMap.
     pub fn dump_price_table(&self) -> HashMap<String, Impl::Values> {
-        let mut price_table: HashMap<String, Impl::Values> = HashMap::with_capacity(self.price_table.len());
+        let mut price_table: HashMap<String, Impl::Values> =
+            HashMap::with_capacity(self.price_table.len());
 
         for element in self.price_table.iter() {
-            let value = *element.value().lock().expect("Failed to receive Mutex").deref();
+            let value = *element
+                .value()
+                .lock()
+                .expect("Failed to receive Mutex")
+                .deref();
             price_table.insert(element.key().clone(), value);
         }
 

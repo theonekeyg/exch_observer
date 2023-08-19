@@ -1,27 +1,16 @@
+use dashmap::DashMap;
+use exch_observer_config::{ObserverConfig, WsConfig};
+use exch_observer_types::{ExchangeKind, ExchangeSymbol, PriceUpdateEvent};
+use exch_subobservers::CombinedObserver;
+use log::{debug, info};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, RwLock, mpsc},
+    fmt::Debug,
     net::{TcpListener, TcpStream},
-    hash::Hash,
-    marker::PhantomData,
-    fmt::{Debug, Display},
-    io::Write,
-};
-use dashmap::DashMap;
-use exch_observer_config::{
-    WsConfig, ObserverConfig
-};
-use exch_subobservers::{
-    CombinedObserver,
-};
-use exch_observer_types::{
-    ExchangeKind, ExchangeSymbol, PriceUpdateEvent, PairedExchangeSymbol
-};
-use tungstenite::{
-    protocol::{Message as WsMessage, WebSocket}
+    sync::{mpsc, Arc, Mutex, RwLock},
 };
 use tokio::runtime::Runtime;
-use log::{info, debug};
+use tungstenite::protocol::{Message as WsMessage, WebSocket};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -35,10 +24,7 @@ pub struct WsClient {
 
 impl WsClient {
     pub fn new(uuid: Uuid, ws: WebSocket<TcpStream>) -> Self {
-        Self {
-            uuid: uuid,
-            ws: ws,
-        }
+        Self { uuid: uuid, ws: ws }
     }
 }
 
@@ -55,7 +41,6 @@ struct ObserverWsDriver {
 }
 
 impl ObserverWsDriver {
-
     pub fn new(
         subscribers: DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
         observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
@@ -73,7 +58,7 @@ impl ObserverWsDriver {
     pub fn rx_block_loop(
         exchange: ExchangeKind,
         rx: mpsc::Receiver<PriceUpdateEvent>,
-        subscribers: Arc<Mutex<Vec<WsClient>>>
+        subscribers: Arc<Mutex<Vec<WsClient>>>,
     ) {
         debug!("Starting rx_block_loop for {}", exchange.to_str());
         loop {
@@ -84,9 +69,14 @@ impl ObserverWsDriver {
             // Keep track of the subscribers that returned an error to remove them from internal
             // list of subscribers later
             let mut drop_indicies = vec![];
-            for (i, subscriber) in subscribers.lock().expect("Failed to acquire mutex").iter_mut().enumerate() {
+            for (i, subscriber) in subscribers
+                .lock()
+                .expect("Failed to acquire mutex")
+                .iter_mut()
+                .enumerate()
+            {
                 match subscriber.ws.send(msg.clone()) {
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) => {
                         debug!("Closing connection to subscriber due to error: {:?}", e);
                         drop_indicies.push(i);
@@ -98,7 +88,10 @@ impl ObserverWsDriver {
             // sorted
             let mut i = 0;
             for index in drop_indicies {
-                subscribers.lock().expect("Failed to acquire mutex").remove(index - i);
+                subscribers
+                    .lock()
+                    .expect("Failed to acquire mutex")
+                    .remove(index - i);
                 i += 1;
             }
         }
@@ -108,7 +101,7 @@ impl ObserverWsDriver {
         observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
         subscribers: Arc<DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>>,
         stream: TcpStream,
-        exchange: ExchangeKind
+        exchange: ExchangeKind,
     ) {
         let mut ws_stream = tungstenite::accept(stream).expect("Failed to accept ws connection");
 
@@ -126,7 +119,10 @@ impl ObserverWsDriver {
 
         // Add websocket stream to the subscribers list
         if let Some(subscribers) = subscribers.get_mut(&exchange) {
-            subscribers.lock().expect("Failed to acquire lock").push(new_user);
+            subscribers
+                .lock()
+                .expect("Failed to acquire lock")
+                .push(new_user);
         } else {
             subscribers.insert(exchange, Arc::new(Mutex::new(vec![new_user])));
         }
@@ -139,7 +135,6 @@ impl ObserverWsDriver {
         rx: mpsc::Receiver<PriceUpdateEvent>,
         exchange: ExchangeKind,
     ) {
-
         // Spawn websocket task to await incoming updates and send them to subscribers.
         let subscribers = self.subscribers.get(&exchange).unwrap().clone();
         let _exchange = exchange.clone();
@@ -148,9 +143,8 @@ impl ObserverWsDriver {
         });
 
         info!("Starting {} WS server on port {}", exchange.to_str(), port);
-        let server = TcpListener::bind(
-            format!("{}:{}", host, port)
-        ).expect("Failed to bind to port");
+        let server =
+            TcpListener::bind(format!("{}:{}", host, port)).expect("Failed to bind to port");
 
         let observer = self.observer.clone();
         let subscribers = self.subscribers.clone();
@@ -167,18 +161,16 @@ impl ObserverWsDriver {
                     observer.clone(),
                     subscribers.clone(),
                     stream,
-                    exchange.clone()
+                    exchange.clone(),
                 );
             }
         });
-
     }
 }
 
 /// This struct serves as a main interface to exch_observer WS service.
 /// It sends the data about the prices to the connected WS clients.
-pub struct ObserverWsRunner
-{
+pub struct ObserverWsRunner {
     /// Config for the ws server
     pub config: WsConfig,
 
@@ -197,8 +189,12 @@ unsafe impl Send for ObserverWsRunner {}
 unsafe impl Sync for ObserverWsRunner {}
 
 impl ObserverWsRunner {
-    pub fn new(observer: &Arc<RwLock<CombinedObserver<ExchangeSymbol>>>, runtime: Arc<Runtime>, config: WsConfig, obs_config: ObserverConfig) -> Self {
-
+    pub fn new(
+        observer: &Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        runtime: Arc<Runtime>,
+        config: WsConfig,
+        obs_config: ObserverConfig,
+    ) -> Self {
         // Create a map of exchange kind to mpsc channel receiver
         let mut exchange_kind_to_rx = HashMap::new();
         let subscribers = DashMap::new();
@@ -239,36 +235,45 @@ impl ObserverWsRunner {
             match kind {
                 ExchangeKind::Binance => {
                     if let Some(config) = &self.obs_config.binance {
-                        self.driver.lock().expect("Failed to capture RWLock").spawn_new_server(
-                            self.config.host.clone().unwrap(),
-                            config.ws_port,
-                            rx,
-                            kind,
-                        );
+                        self.driver
+                            .lock()
+                            .expect("Failed to capture RWLock")
+                            .spawn_new_server(
+                                self.config.host.clone().unwrap(),
+                                config.ws_port,
+                                rx,
+                                kind,
+                            );
                     }
-                },
+                }
 
                 ExchangeKind::Huobi => {
                     if let Some(config) = &self.obs_config.huobi {
-                        self.driver.lock().expect("Failed to capture RWLock").spawn_new_server(
-                            self.config.host.clone().unwrap(),
-                            config.ws_port,
-                            rx,
-                            kind,
-                        );
+                        self.driver
+                            .lock()
+                            .expect("Failed to capture RWLock")
+                            .spawn_new_server(
+                                self.config.host.clone().unwrap(),
+                                config.ws_port,
+                                rx,
+                                kind,
+                            );
                     }
-                },
+                }
 
                 ExchangeKind::Kraken => {
                     if let Some(config) = &self.obs_config.kraken {
-                        self.driver.lock().expect("Failed to capture RWLock").spawn_new_server(
-                            self.config.host.clone().unwrap(),
-                            config.ws_port,
-                            rx,
-                            kind,
-                        );
+                        self.driver
+                            .lock()
+                            .expect("Failed to capture RWLock")
+                            .spawn_new_server(
+                                self.config.host.clone().unwrap(),
+                                config.ws_port,
+                                rx,
+                                kind,
+                            );
                     }
-                },
+                }
 
                 _ => unimplemented!(),
             }

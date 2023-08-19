@@ -1,6 +1,4 @@
-use binance::{
-    websockets::{WebSockets, WebsocketEvent},
-};
+use binance::websockets::{WebSockets, WebsocketEvent};
 // use csv::{Reader, StringRecord};
 use dashmap::DashMap;
 use log::{info, trace};
@@ -9,16 +7,15 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
     vec::Vec,
 };
 use tokio::runtime::Runtime;
 
 use crate::internal::MulticonObserverDriver;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent, ExchangeKind,
-    ExchangeSymbol,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 
 #[allow(unused)]
@@ -159,16 +156,17 @@ where
                     let mut thread_data = thread_data.lock().unwrap();
                     let symbol = str_symbol_mapping
                         .get(&sym_index)
-                        .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
                         .clone();
 
-                    thread_data.update_price_event(
-                        PriceUpdateEvent::new(
-                            ExchangeKind::Binance,
-                            ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                            AskBidValues::new_with_prices(ask_price, bid_price),
-                        )
-                    );
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Binance,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 WebsocketEvent::Kline(kline) => {
                     let kline = kline.kline;
@@ -189,15 +187,16 @@ where
                     let mut thread_data = thread_data.lock().unwrap();
                     let symbol = str_symbol_mapping
                         .get(&sym_index)
-                        .expect(&format!("Symbol {} is not in the required mapping", sym_index))
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
                         .clone();
-                    thread_data.update_price_event(
-                        PriceUpdateEvent::new(
-                            ExchangeKind::Binance,
-                            ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                            AskBidValues::new_with_prices(ask_price, bid_price),
-                        )
-                    );
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Binance,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 _ => (),
             }
@@ -209,9 +208,7 @@ where
             let thread_data = thread_data_clone.lock().unwrap();
             thread_data.is_running.clone()
         };
-        websock
-            .event_loop(&is_running)
-            .unwrap();
+        websock.event_loop(&is_running).unwrap();
     }
 }
 

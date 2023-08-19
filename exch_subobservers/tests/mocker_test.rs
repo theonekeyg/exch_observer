@@ -1,14 +1,10 @@
-use std::{
-    sync::{Arc, Mutex}
-};
+use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
-    ExchangeKind, ExchangeSymbol, AskBidValues, ExchangeObserver, ExchangeValues,
-    PairedExchangeSymbol, SwapOrder, OrderedExchangeSymbol
-};
-use exch_observer_config::{
-    ObserverConfig
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
 };
 use exch_subobservers::{CombinedObserver, MockerObserver};
+use std::sync::{Arc, Mutex};
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 fn get_runtime() -> Runtime {
@@ -23,8 +19,11 @@ fn create_ask_bid_values() -> (f64, f64, Arc<Mutex<AskBidValues>>) {
     let ask_price = rand::random::<f64>();
     let bid_price = ask_price / 2.0;
     (
-        ask_price, bid_price,
-        Arc::new(Mutex::new(AskBidValues::new_with_prices(ask_price, bid_price)))
+        ask_price,
+        bid_price,
+        Arc::new(Mutex::new(AskBidValues::new_with_prices(
+            ask_price, bid_price,
+        ))),
     )
 }
 
@@ -34,11 +33,15 @@ enum ObserverWrapper {
 }
 
 impl ObserverWrapper {
-    pub fn add_price_to_monitor(&mut self, symbol: &ExchangeSymbol, price: Arc<Mutex<AskBidValues>>) {
+    pub fn add_price_to_monitor(
+        &mut self,
+        symbol: &ExchangeSymbol,
+        price: Arc<Mutex<AskBidValues>>,
+    ) {
         match self {
             ObserverWrapper::Combined(combined) => {
                 combined.add_price_to_monitor(ExchangeKind::Mocker, symbol, price);
-            },
+            }
             ObserverWrapper::Mocker(mocker) => {
                 mocker.add_price_to_monitor(symbol, price);
             }
@@ -53,7 +56,7 @@ impl ObserverWrapper {
 ///
 /// `Arguments`:
 ///
-///  * symbols_info - Vector of tuples containing the symbol, ask price, bid price and 
+///  * symbols_info - Vector of tuples containing the symbol, ask price, bid price and
 ///    the Arc<Mutex<AskBidValues>> to be used for the observer
 ///
 ///  * `interchange_str` - String of the symbol to be used for the interchanged symbol
@@ -69,34 +72,22 @@ fn observer_tester_impl(
     str_to_get_usd_value_for: &String,
     expected_usd_value: f64,
 ) {
-
     let mut symbols = Vec::with_capacity(symbols_info.len());
     // Add provided symbols info to the observer, meanwhile testing it
     for (symbol, ask_price, bid_price, price) in &symbols_info {
-
         // Add price and symbol to monitor
         observer.add_price_to_monitor(&symbol.clone(), price.clone());
 
         // Create another scope to drop the mutex lock on price right after
         // we're done with it
         {
-            let price_bind = observer
-                .get_price_from_table(symbol)
-                .unwrap();
+            let price_bind = observer.get_price_from_table(symbol).unwrap();
 
-            let price_from_obs = price_bind
-                .lock()
-                .unwrap();
+            let price_from_obs = price_bind.lock().unwrap();
 
             // Assert ask and bid prices are the same as the ones we set
-            assert_eq!(
-                price_from_obs.get_ask_price(),
-                *ask_price,
-            );
-            assert_eq!(
-                price_from_obs.get_bid_price(),
-                *bid_price,
-            );
+            assert_eq!(price_from_obs.get_ask_price(), *ask_price,);
+            assert_eq!(price_from_obs.get_bid_price(), *bid_price,);
 
             // Also push symbol to symbols vector
             symbols.push(symbol.clone());
@@ -104,10 +95,7 @@ fn observer_tester_impl(
     }
 
     // Assert watching symbols are the same as the ones we added
-    assert_eq!(
-        observer.get_watching_symbols(),
-        &symbols,
-    );
+    assert_eq!(observer.get_watching_symbols(), &symbols,);
 
     observer.start().unwrap();
 
@@ -117,10 +105,7 @@ fn observer_tester_impl(
 
     // Test `get_watching_symbols`.
     // Assert watching symbols are the same as the ones we added
-    assert_eq!(
-        observer.get_watching_symbols(),
-        &symbols,
-    );
+    assert_eq!(observer.get_watching_symbols(), &symbols,);
 
     // Test `get_usd_value` for eth which is added earlier
     assert_eq!(
@@ -158,20 +143,12 @@ fn test_mocker_observer_direct() {
     // Select eth for usd query
     let token_for_usd_query = String::from("eth");
     // Get expected price
-    let token_usd_price = {
-        symbols_infos[0].3.lock().unwrap().showable_price()
-    };
+    let token_usd_price = { symbols_infos[0].3.lock().unwrap().showable_price() };
 
     // Expected interchanged_symblos for eth token
     let expected_interchanged_symbols = vec![
-        OrderedExchangeSymbol::new(
-            &ExchangeSymbol::from("eth", "usdt"),
-            SwapOrder::Sell,
-        ),
-        OrderedExchangeSymbol::new(
-            &ExchangeSymbol::from("uni", "eth"),
-            SwapOrder::Buy,
-        ),
+        OrderedExchangeSymbol::new(&ExchangeSymbol::from("eth", "usdt"), SwapOrder::Sell),
+        OrderedExchangeSymbol::new(&ExchangeSymbol::from("uni", "eth"), SwapOrder::Buy),
     ];
 
     // Invoke tester

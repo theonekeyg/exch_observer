@@ -4,14 +4,14 @@ use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, PriceUpdateEvent
+    PairedExchangeSymbol, PriceUpdateEvent,
 };
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     io,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -45,8 +45,7 @@ where
     enable_mocker: bool,
 }
 
-unsafe impl<Symbol> Send for CombinedObserver<Symbol>
-where
+unsafe impl<Symbol> Send for CombinedObserver<Symbol> where
     Symbol: Eq
         + Hash
         + Clone
@@ -56,11 +55,11 @@ where
         + PairedExchangeSymbol
         + Send
         + Sync
-        + 'static,
-{ }
+        + 'static
+{
+}
 
-unsafe impl<Symbol> Sync for CombinedObserver<Symbol>
-where
+unsafe impl<Symbol> Sync for CombinedObserver<Symbol> where
     Symbol: Eq
         + Hash
         + Clone
@@ -70,8 +69,9 @@ where
         + PairedExchangeSymbol
         + Send
         + Sync
-        + 'static,
-{ }
+        + 'static
+{
+}
 
 impl<Symbol> CombinedObserver<Symbol>
 where

@@ -72,7 +72,7 @@ impl ObserverRunner {
                 &self.main_observer,
                 self.runtime.clone(),
                 ws_config.clone(),
-                self.config.observer.clone()
+                self.config.observer.clone(),
             );
 
             Some(self.runtime.spawn(async move {
@@ -86,7 +86,6 @@ impl ObserverRunner {
 
         // Block main thread until all services are done
         self.runtime.block_on(async {
-
             if let Some(ws_handle) = ws_handle {
                 info!("Awaiting ws handle");
                 ws_handle.await.unwrap();

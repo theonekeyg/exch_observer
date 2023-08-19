@@ -2,14 +2,14 @@ use crate::internal::MulticonObserverDriver;
 use dashmap::DashMap;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol, PriceUpdateEvent
+    PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::info;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
