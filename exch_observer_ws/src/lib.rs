@@ -7,6 +7,7 @@ use std::{
     fmt::{Debug, Display},
     io::Write,
 };
+use dashmap::DashMap;
 use exch_observer_config::{
     WsConfig, ObserverConfig
 };
@@ -45,7 +46,7 @@ impl WsClient {
 /// Manages subscribers and tasks for listening to the price updates.
 struct ObserverWsDriver {
     /// Map of exchange kind to websocket subscribers
-    pub subscribers: HashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
+    pub subscribers: Arc<DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>>,
 
     /// Observer that will be used to get the prices
     observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
@@ -56,12 +57,12 @@ struct ObserverWsDriver {
 impl ObserverWsDriver {
 
     pub fn new(
-        subscribers: HashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
+        subscribers: DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
         observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
         runtime: Arc<Runtime>,
     ) -> Self {
         Self {
-            subscribers: subscribers,
+            subscribers: Arc::new(subscribers),
             observer: observer,
             runtime: runtime,
         }
@@ -103,10 +104,15 @@ impl ObserverWsDriver {
         }
     }
 
-    pub fn handle_new_ws_connection(&mut self, stream: TcpStream, exchange: ExchangeKind) {
+    pub fn handle_new_ws_connection(
+        observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        subscribers: Arc<DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>>,
+        stream: TcpStream,
+        exchange: ExchangeKind
+    ) {
         let mut ws_stream = tungstenite::accept(stream).expect("Failed to accept ws connection");
 
-        let prices_dump = self.observer
+        let prices_dump = observer
             .read()
             .expect("Failed to lock RWLock for reading")
             .dump_price_table(exchange.clone());
@@ -119,10 +125,10 @@ impl ObserverWsDriver {
         let new_user = WsClient::new(Uuid::new_v4(), ws_stream);
 
         // Add websocket stream to the subscribers list
-        if let Some(subscribers) = self.subscribers.get_mut(&exchange) {
+        if let Some(subscribers) = subscribers.get_mut(&exchange) {
             subscribers.lock().expect("Failed to acquire lock").push(new_user);
         } else {
-            self.subscribers.insert(exchange, Arc::new(Mutex::new(vec![new_user])));
+            subscribers.insert(exchange, Arc::new(Mutex::new(vec![new_user])));
         }
     }
 
@@ -132,7 +138,7 @@ impl ObserverWsDriver {
         port: u16,
         rx: mpsc::Receiver<PriceUpdateEvent>,
         exchange: ExchangeKind,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) {
 
         // Spawn websocket task to await incoming updates and send them to subscribers.
         let subscribers = self.subscribers.get(&exchange).unwrap().clone();
@@ -144,17 +150,28 @@ impl ObserverWsDriver {
         info!("Starting {} WS server on port {}", exchange.to_str(), port);
         let server = TcpListener::bind(
             format!("{}:{}", host, port)
-        )?;
+        ).expect("Failed to bind to port");
 
-        // Handle incoming connections
-        for stream in server.incoming() {
-            let stream = stream.expect("Failed to establish connection with incoming client");
-            info!("New ws connection: {:?}", stream);
+        let observer = self.observer.clone();
+        let subscribers = self.subscribers.clone();
 
-            self.handle_new_ws_connection(stream, exchange.clone());
-        }
+        let runtime = self.runtime.clone();
 
-        Ok(())
+        runtime.spawn_blocking(move || {
+            // Handle incoming connections
+            for stream in server.incoming() {
+                let stream = stream.expect("Failed to establish connection with incoming client");
+                info!("New ws connection: {:?}", stream);
+
+                Self::handle_new_ws_connection(
+                    observer.clone(),
+                    subscribers.clone(),
+                    stream,
+                    exchange.clone()
+                );
+            }
+        });
+
     }
 }
 
@@ -184,7 +201,7 @@ impl ObserverWsRunner {
 
         // Create a map of exchange kind to mpsc channel receiver
         let mut exchange_kind_to_rx = HashMap::new();
-        let mut subscribers = HashMap::new();
+        let subscribers = DashMap::new();
         {
             let mut mut_observer = observer.write().expect("Failed to lock RWLock for writing");
             let supported_kinds = mut_observer.get_supported_observers();
@@ -227,7 +244,7 @@ impl ObserverWsRunner {
                             config.ws_port,
                             rx,
                             kind,
-                        ).unwrap();
+                        );
                     }
                 },
 
@@ -238,9 +255,20 @@ impl ObserverWsRunner {
                             config.ws_port,
                             rx,
                             kind,
-                        ).unwrap();
+                        );
                     }
-                }
+                },
+
+                ExchangeKind::Kraken => {
+                    if let Some(config) = &self.obs_config.kraken {
+                        self.driver.lock().expect("Failed to capture RWLock").spawn_new_server(
+                            self.config.host.clone().unwrap(),
+                            config.ws_port,
+                            rx,
+                            kind,
+                        );
+                    }
+                },
 
                 _ => unimplemented!(),
             }

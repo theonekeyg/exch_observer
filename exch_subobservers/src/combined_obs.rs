@@ -45,6 +45,34 @@ where
     enable_mocker: bool,
 }
 
+unsafe impl<Symbol> Send for CombinedObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static,
+{ }
+
+unsafe impl<Symbol> Sync for CombinedObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static,
+{ }
+
 impl<Symbol> CombinedObserver<Symbol>
 where
     Symbol: Eq
