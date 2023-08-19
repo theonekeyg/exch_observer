@@ -57,15 +57,15 @@ impl Default for RpcConfig {
 /// Struct for configuring the WS server.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsConfig {
-    pub host: Option<String>,
-    pub port: Option<u16>,
+    pub host: String,
+    pub port: u16,
 }
 
 impl Default for WsConfig {
     fn default() -> Self {
         Self {
-            host: Some("127.0.0.1".to_string()),
-            port: Some(51012),
+            host: "127.0.0.1".to_string(),
+            port: 51012,
         }
     }
 }

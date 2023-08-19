@@ -130,7 +130,7 @@ impl ObserverWsDriver {
 
     pub fn spawn_new_server(
         &mut self,
-        host: String,
+        host: &String,
         port: u16,
         rx: mpsc::Receiver<PriceUpdateEvent>,
         exchange: ExchangeKind,
@@ -239,7 +239,7 @@ impl ObserverWsRunner {
                             .lock()
                             .expect("Failed to capture RWLock")
                             .spawn_new_server(
-                                self.config.host.clone().unwrap(),
+                                &self.config.host,
                                 config.ws_port,
                                 rx,
                                 kind,
@@ -253,7 +253,7 @@ impl ObserverWsRunner {
                             .lock()
                             .expect("Failed to capture RWLock")
                             .spawn_new_server(
-                                self.config.host.clone().unwrap(),
+                                &self.config.host,
                                 config.ws_port,
                                 rx,
                                 kind,
@@ -267,7 +267,7 @@ impl ObserverWsRunner {
                             .lock()
                             .expect("Failed to capture RWLock")
                             .spawn_new_server(
-                                self.config.host.clone().unwrap(),
+                                &self.config.host,
                                 config.ws_port,
                                 rx,
                                 kind,
@@ -277,7 +277,9 @@ impl ObserverWsRunner {
 
                 _ => unimplemented!(),
             }
-            // self.driver.write().spawn_new_server(
         }
     }
 }
+
+pub mod client;
+pub use client::*;
