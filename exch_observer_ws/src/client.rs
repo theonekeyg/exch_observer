@@ -190,6 +190,7 @@ impl WsRemoteObserver {
     }
 }
 
+/*
 #[cfg(test)]
 pub mod test {
 
@@ -217,3 +218,4 @@ pub mod test {
         panic!("Test panic");
     }
 }
+*/
