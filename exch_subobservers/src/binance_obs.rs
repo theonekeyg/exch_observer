@@ -147,14 +147,13 @@ where
 
                     let ask_price = f64::from_str(&book.best_ask).unwrap();
                     let bid_price = f64::from_str(&book.best_bid).unwrap();
-                    let price = (ask_price + bid_price) / 2.0;
 
                     let update_value = price_table.get(&sym_index).unwrap();
                     update_value
                         .lock()
                         .unwrap()
                         .update_price((ask_price, bid_price));
-                    trace!("[{}] Price: {:?}", book.symbol, price);
+                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
 
                     // Send price update events to the thread_data tx channel
                     let mut thread_data = thread_data.lock().unwrap();
@@ -176,16 +175,15 @@ where
 
                     let sym_index = kline.symbol.clone().to_ascii_lowercase();
 
-                    let price_high = f64::from_str(kline.high.as_ref()).unwrap();
-                    let price_low = f64::from_str(kline.low.as_ref()).unwrap();
-                    let price = (price_high + price_low) / 2.0;
+                    let ask_price = f64::from_str(kline.high.as_ref()).unwrap();
+                    let bid_price = f64::from_str(kline.low.as_ref()).unwrap();
 
                     let update_value = price_table.get(&sym_index).unwrap();
                     update_value
                         .lock()
                         .unwrap()
-                        .update_price((price_high, price_low));
-                    trace!("[{}] Price: {:?}", kline.symbol, price);
+                        .update_price((ask_price, bid_price));
+                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
 
                     // Send price update events to the thread_data tx channel
                     let mut thread_data = thread_data.lock().unwrap();
@@ -197,7 +195,7 @@ where
                         PriceUpdateEvent::new(
                             ExchangeKind::Binance,
                             ExchangeSymbol::new(symbol.base(), symbol.quote()),
-                            AskBidValues::new_with_prices(price_high, price_low),
+                            AskBidValues::new_with_prices(ask_price, bid_price),
                         )
                     );
                 }
