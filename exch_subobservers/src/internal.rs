@@ -162,7 +162,7 @@ where
         if !self.price_table.contains_key(&_symbol) {
             self.price_table.insert(_symbol.clone(), price);
 
-            // The symbol could be added to the connected_symbolsk
+            // The symbol could be added to the connected_symbols
             if !self.connected_symbols.contains_key(symbol.base()) {
                 self.connected_symbols
                     .insert(symbol.base().to_string().clone(), Vec::new());

@@ -16,7 +16,10 @@ exch_clients = { workspace = true }
 exch_observer_config = { workspace = true }
 exch_observer_derive = { workspace = true }
 exch_observer_types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
+ringbuf = { workspace = true }
 tokio = { workspace = true }
 tungstenite = { workspace = true }
