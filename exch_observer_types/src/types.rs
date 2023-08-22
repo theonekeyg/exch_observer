@@ -624,6 +624,12 @@ impl FromStr for ExchangeKind {
     }
 }
 
+impl Display for ExchangeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
 /// Enum to represent an account state on the exchange
 #[derive(Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub enum ExchangeAccountState {
