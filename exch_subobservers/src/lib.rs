@@ -1,6 +1,7 @@
 pub mod binance_obs;
 pub mod combined_obs;
 pub mod huobi_obs;
+pub mod error;
 mod internal;
 pub mod kraken_obs;
 pub mod mocker_obs;

@@ -12,7 +12,6 @@ exch_observer_types = { workspace = true }
 exch_subobservers = { workspace = true }
 log = { workspace = true }
 tungstenite = { workspace = true }
-thiserror = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 ringbuf = { workspace = true }
