@@ -2,13 +2,14 @@ use crate::internal::MulticonObserverDriver;
 use dashmap::DashMap;
 use exch_observer_types::{
     AskBidValues, ExchangeObserver, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol,
+    PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::info;
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -50,6 +51,7 @@ where
     fn new_instance(
         _symbols: &Vec<Symbol>,
         _price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        _str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         _thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         println!("new_instance()");
@@ -99,5 +101,13 @@ where
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         self.driver.get_watching_symbols()
+    }
+
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.driver.set_tx_fifo(tx);
+    }
+
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values> {
+        self.driver.dump_price_table()
     }
 }

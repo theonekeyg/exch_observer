@@ -5,14 +5,15 @@ use exch_apis::{
     kraken_ws::KrakenWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::{info, trace};
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -60,6 +61,7 @@ where
     fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
         price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
@@ -73,19 +75,37 @@ where
                 )
             })
             .collect::<Vec<_>>();
+
+        let thread_data_clone = thread_data.clone();
         let mut websock = KrakenWebsocket::new(move |event: WebsocketEvent| -> WsResult<()> {
             match event {
                 WebsocketEvent::KLineEvent(kline) => {
-                    let price_high = kline.high;
-                    let price_low = kline.low;
-                    let price = (price_high + price_low) / 2.0;
+                    let ask_price = kline.high;
+                    let bid_price = kline.low;
+                    // let price = (ask_price + bid_price) / 2.0;
                     let sym_index = kline.sym.clone();
                     let update_value = price_table.get(&sym_index).unwrap();
                     update_value
                         .lock()
                         .unwrap()
-                        .update_price((price_high, price_low));
-                    trace!("[{}] Price: {:?}", sym_index, price);
+                        .update_price((ask_price, bid_price));
+
+                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    let symbol = str_symbol_mapping
+                        .get(&sym_index)
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
+                        .clone();
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Kraken,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 WebsocketEvent::BookTickerEvent(book) => {
                     let ask_price = book.best_ask;
@@ -100,17 +120,36 @@ where
                         .unwrap()
                         .update_price((ask_price, bid_price));
                     trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    let symbol = str_symbol_mapping
+                        .get(&sym_index)
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
+                        .clone();
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Kraken,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
             }
 
             WsResult::Ok(())
         });
+
         websock
             .connect_multiple_streams(ws_query_subs)
             .expect("Failed connect streams");
-        websock
-            .event_loop(&thread_data.lock().unwrap().is_running)
-            .expect("Failed event loop");
+
+        let is_running = {
+            let thread_data = thread_data_clone.lock().unwrap();
+            thread_data.is_running.clone()
+        };
+        websock.event_loop(&is_running).expect("Failed event loop");
     }
 }
 
@@ -158,5 +197,13 @@ where
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         self.driver.get_watching_symbols()
+    }
+
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.driver.set_tx_fifo(tx);
+    }
+
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values> {
+        self.driver.dump_price_table()
     }
 }

@@ -1,0 +1,19 @@
+[package]
+name = "exch_observer_ws"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dashmap = { workspace = true }
+exch_observer_config = { workspace = true }
+exch_observer_types = { workspace = true }
+exch_subobservers = { workspace = true }
+log = { workspace = true }
+tungstenite = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+ringbuf = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }

@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        mpsc, Arc, Mutex,
     },
 };
 use tokio::task::JoinHandle;
@@ -450,7 +450,7 @@ impl ExchangeValues for ExchangeSingleValues {
 /// Structure to store a price as a pair of values (ask/bid).
 /// Value it stores is best ask/bid price currently in the exchange pair.
 /// This structure is used by default in all observers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AskBidValues {
     pub ask_price: f64,
     pub bid_price: f64,
@@ -552,10 +552,17 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
 
     /// Returns the reference to vector of symbols that are being watched
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
+
+    /// Function to set tx sender to send messages on price updates from observer.
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>);
+
+    /// Function to dump the existing prices into a newly created HashMap. Pretty expensive
+    /// function to call.
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values>;
 }
 
 /// Enum to represent an exchange type
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum ExchangeKind {
     Binance,
     Bitfinex,
@@ -614,6 +621,12 @@ impl FromStr for ExchangeKind {
             "uniswap" => Self::Uniswap,
             _ => Self::Unknown,
         })
+    }
+}
+
+impl Display for ExchangeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_str())
     }
 }
 
@@ -703,14 +716,39 @@ impl Into<ExchangeBalance> for BinanceBalance {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Price update event, must be sent to receiver when price is updated
+pub struct PriceUpdateEvent {
+    pub exchange: ExchangeKind,
+    pub symbol: ExchangeSymbol,
+    pub price: AskBidValues,
+}
+
+impl PriceUpdateEvent {
+    pub fn new(exchange: ExchangeKind, symbol: ExchangeSymbol, price: AskBidValues) -> Self {
+        Self {
+            exchange: exchange,
+            symbol: symbol,
+            price: price,
+        }
+    }
+}
+
 /// Internal data structure for the observer worker threads.
 /// Used to implement voting mechanism for symbols to stop their threads,
 /// this mechanism allowes threads to monitor multiple symbols at once
 pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
+    /// Amount of symbols that this thread is monitoring
     pub length: usize,
+    /// Amount of requests to stop this thread, happens when all symbols are stopped
     pub requests_to_stop: usize,
+    /// Requests map to stop this thread, happens when all symbols are stopped
     pub requests_to_stop_map: HashMap<Symbol, bool>,
-    pub is_running: AtomicBool,
+    /// Atomic bool to check if thread is running
+    pub is_running: Arc<AtomicBool>,
+    /// Sender to send update prices
+    pub tx: Option<mpsc::Sender<PriceUpdateEvent>>,
+    /// Handle to the tokio task
     pub handle: Option<JoinHandle<()>>,
 }
 
@@ -727,7 +765,8 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             length: length,
             requests_to_stop: 0,
             requests_to_stop_map: symbols_map,
-            is_running: AtomicBool::new(true),
+            is_running: Arc::new(AtomicBool::new(true)),
+            tx: None,
             handle: None,
         }
     }
@@ -747,5 +786,17 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
             .iter()
             .filter(|(_, &is_running)| is_running)
             .map(|(symbol, _)| symbol)
+    }
+
+    /// Set the tx channel to send price updates
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.tx = Some(tx);
+    }
+
+    /// Send update price event to the tx channel if it exists
+    pub fn update_price_event(&mut self, event: PriceUpdateEvent) {
+        if let Some(tx) = &self.tx {
+            tx.send(event).unwrap();
+        }
     }
 }

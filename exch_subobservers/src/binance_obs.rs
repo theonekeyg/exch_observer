@@ -1,23 +1,21 @@
-use binance::{
-    model::Symbol as BSymbol,
-    websockets::{WebSockets, WebsocketEvent},
-};
+use binance::websockets::{WebSockets, WebsocketEvent};
 // use csv::{Reader, StringRecord};
 use dashmap::DashMap;
 use log::{info, trace};
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
     vec::Vec,
 };
 use tokio::runtime::Runtime;
 
 use crate::internal::MulticonObserverDriver;
 use exch_observer_types::{
-    AskBidValues, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
-    OrderedExchangeSymbol, PairedExchangeSymbol,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
+    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 
 #[allow(unused)]
@@ -95,7 +93,6 @@ where
         + Send
         + Sync
         + PairedExchangeSymbol
-        + From<BSymbol>
         + 'static,
 {
     driver: MulticonObserverDriver<Symbol, Self>,
@@ -111,7 +108,6 @@ where
         + Into<String>
         + Send
         + Sync
-        + From<BSymbol>
         + PairedExchangeSymbol
         + 'static,
 {
@@ -125,6 +121,7 @@ where
     pub fn launch_worker_multiple(
         symbols: &Vec<Symbol>,
         price_table: Arc<DashMap<String, Arc<Mutex<<Self as ExchangeObserver<Symbol>>::Values>>>>,
+        str_symbol_mapping: Arc<DashMap<String, Symbol>>,
         thread_data: Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
     ) {
         info!("Started another batch of symbols");
@@ -136,6 +133,7 @@ where
             })
             .collect::<Vec<_>>();
 
+        let thread_data_clone = thread_data.clone();
         let mut websock = WebSockets::new(move |event: WebsocketEvent| {
             match event {
                 WebsocketEvent::OrderBook(order_book) => {
@@ -146,30 +144,59 @@ where
 
                     let ask_price = f64::from_str(&book.best_ask).unwrap();
                     let bid_price = f64::from_str(&book.best_bid).unwrap();
-                    let price = (ask_price + bid_price) / 2.0;
 
                     let update_value = price_table.get(&sym_index).unwrap();
                     update_value
                         .lock()
                         .unwrap()
                         .update_price((ask_price, bid_price));
-                    trace!("[{}] Price: {:?}", book.symbol, price);
+                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    let symbol = str_symbol_mapping
+                        .get(&sym_index)
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
+                        .clone();
+
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Binance,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 WebsocketEvent::Kline(kline) => {
                     let kline = kline.kline;
 
                     let sym_index = kline.symbol.clone().to_ascii_lowercase();
 
-                    let price_high = f64::from_str(kline.high.as_ref()).unwrap();
-                    let price_low = f64::from_str(kline.low.as_ref()).unwrap();
-                    let price = (price_high + price_low) / 2.0;
+                    let ask_price = f64::from_str(kline.high.as_ref()).unwrap();
+                    let bid_price = f64::from_str(kline.low.as_ref()).unwrap();
 
                     let update_value = price_table.get(&sym_index).unwrap();
                     update_value
                         .lock()
                         .unwrap()
-                        .update_price((price_high, price_low));
-                    trace!("[{}] Price: {:?}", kline.symbol, price);
+                        .update_price((ask_price, bid_price));
+                    trace!("[{}] Ask: {:?}, Bid: {:?}", sym_index, ask_price, bid_price);
+
+                    // Send price update events to the thread_data tx channel
+                    let mut thread_data = thread_data.lock().unwrap();
+                    let symbol = str_symbol_mapping
+                        .get(&sym_index)
+                        .expect(&format!(
+                            "Symbol {} is not in the required mapping",
+                            sym_index
+                        ))
+                        .clone();
+                    thread_data.update_price_event(PriceUpdateEvent::new(
+                        ExchangeKind::Binance,
+                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        AskBidValues::new_with_prices(ask_price, bid_price),
+                    ));
                 }
                 _ => (),
             }
@@ -177,9 +204,11 @@ where
         });
 
         websock.connect_multiple_streams(&ws_query_subs).unwrap();
-        websock
-            .event_loop(&thread_data.lock().unwrap().is_running)
-            .unwrap();
+        let is_running = {
+            let thread_data = thread_data_clone.lock().unwrap();
+            thread_data.is_running.clone()
+        };
+        websock.event_loop(&is_running).unwrap();
     }
 }
 
@@ -194,7 +223,6 @@ where
         + PairedExchangeSymbol
         + Send
         + Sync
-        + From<BSymbol>
         + 'static,
 {
     type Values = AskBidValues;
@@ -228,5 +256,13 @@ where
 
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         self.driver.get_watching_symbols()
+    }
+
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        self.driver.set_tx_fifo(tx);
+    }
+
+    fn dump_price_table(&self) -> HashMap<Symbol, Self::Values> {
+        self.driver.dump_price_table()
     }
 }

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+thiserror = { workspace = true }
 anyhow = { workspace = true }
 binance = { workspace = true }
 csv = { workspace = true }
@@ -16,7 +17,10 @@ exch_clients = { workspace = true }
 exch_observer_config = { workspace = true }
 exch_observer_derive = { workspace = true }
 exch_observer_types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
+ringbuf = { workspace = true }
 tokio = { workspace = true }
 tungstenite = { workspace = true }

@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use exch_observer_types::{
     ExchangeObserver, ExchangeValues, ObserverWorkerThreadData, OrderedExchangeSymbol,
-    PairedExchangeSymbol, SwapOrder, USD_STABLES,
+    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES,
 };
 use log::debug;
 use std::{
@@ -9,7 +9,8 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    sync::{Arc, Mutex},
+    ops::Deref,
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -37,12 +38,16 @@ where
     /// map from already concatenated pair names, when turning concatenated string into
     /// ExchangeSymbol is impossible.
     price_table: Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+    /// Internal mapping of symbol string representation to the symbol itself.
+    str_symbol_mapping: Arc<DashMap<String, Symbol>>,
     async_runner: Arc<Runtime>,
 
     /// Necessary for getting control of the threads execution from a function.
     /// One example of such usage might be killing the thread with multiple symbols
     /// when `remove_symbol` was called on every symbol in this thread.
     threads_data_mapping: HashMap<Symbol, Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
+    /// Vector of unique threads that are currently running.
+    threads_data_vec: Vec<Arc<Mutex<ObserverWorkerThreadData<Symbol>>>>,
     /// Symbols in the queue to be added to the new thread, which is created when
     /// `symbols_queue_limit` is reached
     symbols_in_queue: Vec<Symbol>,
@@ -56,6 +61,7 @@ where
         dyn Fn(
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+                Arc<DashMap<String, Symbol>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
             ) + Send
             + Sync
@@ -76,13 +82,14 @@ where
         + PairedExchangeSymbol
         + 'static,
     Impl: ExchangeObserver<Symbol>,
-    Impl::Values: Send + 'static,
+    Impl::Values: Send + Copy + 'static,
 {
     pub fn new<F>(async_runner: Arc<Runtime>, symbols_queue_limit: usize, spawn_callback: F) -> Self
     where
         F: Fn(
                 &Vec<Symbol>,
                 Arc<DashMap<String, Arc<Mutex<Impl::Values>>>>,
+                Arc<DashMap<String, Symbol>>,
                 Arc<Mutex<ObserverWorkerThreadData<Symbol>>>,
             ) + Send
             + Sync
@@ -92,9 +99,11 @@ where
             watching_symbols: vec![],
             connected_symbols: HashMap::new(),
             price_table: Arc::new(DashMap::new()),
+            str_symbol_mapping: Arc::new(DashMap::new()),
             async_runner: async_runner,
 
             threads_data_mapping: HashMap::new(),
+            threads_data_vec: vec![],
             symbols_in_queue: vec![],
             symbols_queue_limit: symbols_queue_limit,
             marker: PhantomData,
@@ -102,6 +111,9 @@ where
         }
     }
 
+    /// Spawns a new thread for the symbols in the queue. It clear the queue after spawning a
+    /// thread. It also doesn't perform checks for queue limit, simply spawns the thread for
+    /// the current queue.
     fn spawn_tasks_for_queue_symbols(&mut self) {
         if self.symbols_in_queue.len() > 0 {
             let thread_data = Arc::new(Mutex::new(ObserverWorkerThreadData::from(
@@ -112,17 +124,25 @@ where
                 self.threads_data_mapping
                     .insert(sym.clone(), thread_data.clone());
             }
+            self.threads_data_vec.push(thread_data.clone());
 
             let spawn_callback = self.spawn_callback.clone();
             let symbols_in_queue = self.symbols_in_queue.clone();
             let price_table = self.price_table.clone();
+            let str_symbol_mapping = self.str_symbol_mapping.clone();
 
             // Spawn a new thread for the symbols in the queue
             self.async_runner.clone().spawn_blocking(move || {
-                // Run main blocking callback
-                (spawn_callback)(&symbols_in_queue, price_table.clone(), thread_data.clone());
+                // Run blocking callback defined in end implementation
+                (spawn_callback)(
+                    &symbols_in_queue,
+                    price_table,
+                    str_symbol_mapping,
+                    thread_data,
+                );
             });
 
+            // Clear symbols queue
             self.symbols_in_queue.clear();
         }
     }
@@ -142,6 +162,7 @@ where
         if !self.price_table.contains_key(&_symbol) {
             self.price_table.insert(_symbol.clone(), price);
 
+            // The symbol could be added to the connected_symbols
             if !self.connected_symbols.contains_key(symbol.base()) {
                 self.connected_symbols
                     .insert(symbol.base().to_string().clone(), Vec::new());
@@ -152,6 +173,8 @@ where
                     .insert(symbol.quote().to_string().clone(), Vec::new());
             }
 
+            // Insert OrderedExchangeSymbol into the connected_symbols map for both
+            // base and quote tokens
             self.connected_symbols
                 .get_mut(symbol.base())
                 .expect("INTERNAL ERROR: Base symbol wasn't found")
@@ -161,12 +184,19 @@ where
                 .expect("INTERNAL ERROR: Quote symbol wasn't found")
                 .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
+            // Add symbol to `str_symbol_mapping`
+            self.str_symbol_mapping
+                .insert(_symbol.clone(), symbol.clone());
+
+            // Insert symbol into the symbol queue
             self.symbols_in_queue.push(symbol.clone());
 
+            // If the queue limit is reached, spawn a new thread for the symbols in the queue
             if self.symbols_in_queue.len() >= self.symbols_queue_limit {
                 self.spawn_tasks_for_queue_symbols();
             }
 
+            // Add new symbol to watching symbols
             self.watching_symbols.push(symbol.clone())
         }
     }
@@ -304,5 +334,33 @@ where
 
     pub fn get_watching_symbols(&self) -> &'_ Vec<Symbol> {
         return &self.watching_symbols;
+    }
+
+    /// Sets tx price-update fifo for all running threads
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+        // Set tx fifo for all running threads
+        for thread_data in &self.threads_data_vec {
+            thread_data.lock().unwrap().set_tx_fifo(tx.clone());
+        }
+    }
+
+    /// Function to dump the existing prices into a newly created HashMap.
+    pub fn dump_price_table(&self) -> HashMap<Symbol, Impl::Values> {
+        let mut price_table: HashMap<Symbol, Impl::Values> =
+            HashMap::with_capacity(self.price_table.len());
+
+        for element in self.price_table.iter() {
+            let value = *element
+                .value()
+                .lock()
+                .expect("Failed to receive Mutex")
+                .deref();
+            let key = element.key().clone();
+            let symbol = self.str_symbol_mapping.get(&key).unwrap();
+
+            price_table.insert(symbol.clone(), value);
+        }
+
+        price_table
     }
 }

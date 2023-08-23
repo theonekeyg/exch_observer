@@ -1,5 +1,9 @@
 num_threads = 16
 
+[ws]
+port = 51012
+host = "127.0.0.1"
+
 [rpc]
 port = 51011
 host = "127.0.0.1"
@@ -7,4 +11,6 @@ host = "127.0.0.1"
 [observer.binance]
 symbols_path = "./assets/binance_symbols.csv"
 allowed_symbols = [ "usdt", "busd", "cfx", "stx", "agix", "btc", "ltc", "xrp", "shib", "doge", "sol", "ada", "eth", "apt", "matic", "dot", "bnb" ]
+# allowed_symbols = [ "USDT", "BUSD", "CFX", "STX", "AGIX", "BTC", "LTC", "XRP", "SHIB", "DOGE", "SOL", "ADA", "ETH", "APT", "MATIC", "DOT", "BNB" ]
 enable = true
+ws_port = 51013

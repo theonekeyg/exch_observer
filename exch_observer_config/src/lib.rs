@@ -10,6 +10,19 @@ pub struct KrakenConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
+}
+
+impl KrakenConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51015,
+        }
+    }
 }
 
 /// Struct representing the configuration for the Binance observer
@@ -20,6 +33,19 @@ pub struct BinanceConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
+}
+
+impl BinanceConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51013,
+        }
+    }
 }
 
 /// Struct representing the configuration for the Huobi observer
@@ -30,6 +56,19 @@ pub struct HuobiConfig {
     pub symbols_path: String,
     /// Flag to enable the observer or utilities related with them
     pub enable: bool,
+    /// Port for the WS server
+    pub ws_port: u16,
+}
+
+impl HuobiConfig {
+    pub fn new_with_csv_symbols(symbols_path: String) -> Self {
+        Self {
+            allowed_symbols: None,
+            symbols_path,
+            enable: true,
+            ws_port: 51014,
+        }
+    }
 }
 
 /// Struct for configuring the RPC server/client
@@ -44,6 +83,22 @@ impl Default for RpcConfig {
         Self {
             port: Some(51011),
             host: Some("127.0.0.1".to_string()),
+        }
+    }
+}
+
+/// Struct for configuring the WS server.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WsConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Default for WsConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 51012,
         }
     }
 }
@@ -64,6 +119,7 @@ pub struct ExchObserverConfig {
     pub num_threads: Option<usize>,
     pub observer: ObserverConfig,
     pub rpc: Option<RpcConfig>,
+    pub ws: Option<WsConfig>,
 }
 
 impl ExchObserverConfig {
@@ -72,6 +128,7 @@ impl ExchObserverConfig {
             num_threads: None,
             observer: ObserverConfig::default(),
             rpc: None,
+            ws: None,
         }
     }
 
@@ -87,6 +144,10 @@ impl ExchObserverConfig {
 
         if config.rpc.is_none() {
             config.rpc = Some(RpcConfig::default());
+        }
+
+        if config.ws.is_none() {
+            config.ws = Some(WsConfig::default());
         }
 
         Ok(config)

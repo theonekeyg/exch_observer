@@ -1,18 +1,17 @@
 use crate::{BinanceObserver, HuobiObserver, KrakenObserver, MockerObserver};
 use anyhow::Result;
-use binance::model::Symbol as BSymbol;
 use csv::{Reader, StringRecord};
 use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol,
+    PairedExchangeSymbol, PriceUpdateEvent,
 };
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     io,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
 };
 use tokio::runtime::Runtime;
 
@@ -29,7 +28,6 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Into<String>
-        + From<BSymbol>
         + Send
         + Sync
         + 'static,
@@ -47,6 +45,34 @@ where
     enable_mocker: bool,
 }
 
+unsafe impl<Symbol> Send for CombinedObserver<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static
+{
+}
+
+unsafe impl<Symbol> Sync for CombinedObserver<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Send
+        + Sync
+        + 'static
+{
+}
+
 impl<Symbol> CombinedObserver<Symbol>
 where
     Symbol: Eq
@@ -57,7 +83,6 @@ where
         + Into<String>
         + PairedExchangeSymbol
         + Send
-        + From<BSymbol>
         + Sync
         + 'static,
 {
@@ -94,6 +119,10 @@ where
     /// Sets the tokio runtime for the observer.
     pub fn set_runtime(&mut self, runtime: Arc<Runtime>) {
         self.runtime = Some(runtime);
+    }
+
+    pub fn get_supported_observers(&self) -> Vec<ExchangeKind> {
+        self.observers.keys().cloned().collect()
     }
 
     /// Creates observers for each exchange in the config, must be called before `load_symbols`.
@@ -320,5 +349,19 @@ where
         }
 
         None
+    }
+
+    pub fn set_tx_fifo(&mut self, kind: ExchangeKind, tx: mpsc::Sender<PriceUpdateEvent>) {
+        if let Some(observer) = self.observers.get_mut(&kind) {
+            observer.set_tx_fifo(tx);
+        }
+    }
+
+    pub fn dump_price_table(&self, kind: ExchangeKind) -> HashMap<Symbol, AskBidValues> {
+        if let Some(observer) = self.observers.get(&kind) {
+            return observer.dump_price_table();
+        }
+
+        HashMap::new()
     }
 }

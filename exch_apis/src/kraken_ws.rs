@@ -234,7 +234,7 @@ impl<'a> KrakenWebsocket<'a> {
         if let Some(ref mut socket) = self.socket {
             socket
                 .0
-                .write_message(Message::Text(format!(
+                .send(Message::Text(format!(
                     "{{
                 \"event\":\"subscribe\",
                 \"pair\":[\"{}\"],
@@ -254,7 +254,7 @@ impl<'a> KrakenWebsocket<'a> {
         if let Some(ref mut socket) = self.socket {
             socket
                 .0
-                .write_message(Message::Text(String::from(format!(
+                .send(Message::Text(String::from(format!(
                     "{{
                 \"event\": \"subscribe\",
                 \"pair\": {},
@@ -284,7 +284,7 @@ impl<'a> KrakenWebsocket<'a> {
             if let Some(ref mut socket) = self.socket {
                 let msg = socket
                     .0
-                    .read_message()
+                    .read()
                     .map_err(|e| WebSocketError::ReadError(e.to_string()))?;
                 match msg {
                     Message::Text(text) => {

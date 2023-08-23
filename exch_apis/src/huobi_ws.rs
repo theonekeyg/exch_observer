@@ -222,7 +222,7 @@ impl<'a> HuobiWebsocket<'a> {
         if let Some(ref mut socket) = self.socket {
             socket
                 .0
-                .write_message(Message::Text(format!(
+                .send(Message::Text(format!(
                     "{{\"sub\": \"{}\", \"id\": \"id{}\"}}",
                     subscription,
                     HUOBI_UNIQUE_ID.fetch_add(1, Ordering::Relaxed)
@@ -247,7 +247,7 @@ impl<'a> HuobiWebsocket<'a> {
             if let Some(ref mut socket) = self.socket {
                 let msg = socket
                     .0
-                    .read_message()
+                    .read()
                     .map_err(|e| WebSocketError::ReadError(e.to_string()))?;
                 match msg {
                     Message::Binary(bin) => {
@@ -274,10 +274,7 @@ impl<'a> HuobiWebsocket<'a> {
                                 trace!("Received ping event: {}", event.ping);
                                 socket
                                     .0
-                                    .write_message(Message::Text(format!(
-                                        "{{\"pong\":{}}}",
-                                        event.ping
-                                    )))
+                                    .send(Message::Text(format!("{{\"pong\":{}}}", event.ping)))
                                     .map_err(|e| WebSocketError::WriteError(e.to_string()))?;
                                 continue;
                             }
