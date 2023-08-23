@@ -1,34 +1,23 @@
-use std::{
-    net::TcpStream,
-    sync::{
-        Arc, Mutex
-    },
-    ops::Deref,
-    collections::{HashMap, HashSet},
-    time::Duration,
-};
+use crate::error::{ObserverError, ObserverResult as OResult};
+use dashmap::{mapref::one::Ref, DashMap};
+use exch_observer_config::{ObserverConfig, WsConfig};
 use exch_observer_types::{
-    ExchangeKind, AskBidValues, PriceUpdateEvent, ExchangeSymbol, OrderedExchangeSymbol,
-    USD_STABLES, PairedExchangeSymbol, ExchangeValues, SwapOrder
-};
-use exch_observer_config::{
-    ObserverConfig, WsConfig
-};
-use dashmap::{DashMap, mapref::one::Ref};
-use tungstenite::{
-    connect, protocol::WebSocket, stream::MaybeTlsStream, Message,
-    error::Result as WsResult,
-    client::IntoClientRequest,
-};
-use ringbuf::{
-    HeapRb,
-    producer::Producer,
-    consumer::Consumer
+    AskBidValues, ExchangeKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
+    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES,
 };
 use log::{error, info};
-use tokio::{task::JoinHandle, runtime::{Runtime}};
-use crate::error::{
-    ObserverError, ObserverResult as OResult
+use ringbuf::{consumer::Consumer, producer::Producer, HeapRb};
+use std::{
+    collections::{HashMap, HashSet},
+    net::TcpStream,
+    ops::Deref,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+use tokio::{runtime::Runtime, task::JoinHandle};
+use tungstenite::{
+    client::IntoClientRequest, connect, error::Result as WsResult, protocol::WebSocket,
+    stream::MaybeTlsStream, Message,
 };
 
 struct WsObserverClientThreadData {
@@ -80,7 +69,6 @@ pub struct WsRemoteObserverClient {
 
 impl WsRemoteObserverClient {
     pub fn new(runtime: Arc<Runtime>, obs_config: ObserverConfig, ws_config: WsConfig) -> Self {
-
         let mut thread_data_vec = Vec::new();
         let mut rx_map = HashMap::new();
 
@@ -123,7 +111,7 @@ impl WsRemoteObserverClient {
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
-                    ExchangeKind::Kraken
+                    ExchangeKind::Kraken,
                 );
 
                 thread_data_vec.push(thread_data);
@@ -137,16 +125,20 @@ impl WsRemoteObserverClient {
             obs_config: obs_config,
             ws_config: ws_config,
             jobs: vec![],
-            runtime: runtime
+            runtime: runtime,
         }
     }
 
-    fn get_working_connection<Req: IntoClientRequest>(req: Req) -> WsResult<WebSocket<MaybeTlsStream<TcpStream>>> {
+    fn get_working_connection<Req: IntoClientRequest>(
+        req: Req,
+    ) -> WsResult<WebSocket<MaybeTlsStream<TcpStream>>> {
         let (ws_stream, _) = connect(req)?;
         Ok(ws_stream)
     }
 
-    fn get_connection_with_reconnect_on_failure(req: &String) -> WebSocket<MaybeTlsStream<TcpStream>> {
+    fn get_connection_with_reconnect_on_failure(
+        req: &String,
+    ) -> WebSocket<MaybeTlsStream<TcpStream>> {
         loop {
             // Try to establish connection
             if let Ok(ws_stream) = Self::get_working_connection(req) {
@@ -154,7 +146,6 @@ impl WsRemoteObserverClient {
                 info!("Connected to the ws server: {}", req);
                 break ws_stream;
             } else {
-
                 // Log error on failure, sleep for 5 seconds and try again
                 error!("Failed to connect to the ws server: {}, trying to reconnect with 5 seconds interval", req);
                 // Sleep for 5 seconds
@@ -164,7 +155,10 @@ impl WsRemoteObserverClient {
         }
     }
 
-    fn spawn_ws_handler(runtime: Arc<Runtime>, mut thread_data: WsObserverClientThreadData) -> JoinHandle<()> {
+    fn spawn_ws_handler(
+        runtime: Arc<Runtime>,
+        mut thread_data: WsObserverClientThreadData,
+    ) -> JoinHandle<()> {
         runtime.spawn_blocking(move || {
 
             // Firstly try to initialize the ws_stream.
@@ -210,7 +204,8 @@ impl WsRemoteObserverClient {
     // Start the main WS client application loop.
     pub fn start(&mut self) {
         for thread_data in self.thread_data_vec.drain(0..) {
-            self.jobs.push(Self::spawn_ws_handler(self.runtime.clone(), thread_data));
+            self.jobs
+                .push(Self::spawn_ws_handler(self.runtime.clone(), thread_data));
         }
     }
 
@@ -224,8 +219,7 @@ impl WsRemoteObserverClient {
 
 /// Internal threads that handles each exchange, including websocket connection, price table,
 /// and other necessary data.
-struct RemoteObserverDriver
-{
+struct RemoteObserverDriver {
     /// `price_table` - Represents the main storage for prices, as well as accessing the
     /// prices in the storage. Here key is the pair name (e.g. ethusdt), not the single
     /// token like in `connected_symbols`. It is made this way to be able to index this
@@ -249,9 +243,7 @@ struct RemoteObserverDriver
     rx: Option<Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>>,
 }
 
-impl RemoteObserverDriver
-where
-{
+impl RemoteObserverDriver {
     #[allow(dead_code)]
     pub fn new(
         rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
@@ -273,7 +265,8 @@ where
 
     #[allow(dead_code)]
     pub fn start(&mut self) {
-        let rx = self.rx
+        let rx = self
+            .rx
             .take()
             .expect("Invalid call of start method, RemoveObserverDriver::rx is None");
         let job = Self::spawn_listen_task(
@@ -317,10 +310,8 @@ where
         connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
         runtime: Arc<Runtime>,
     ) -> JoinHandle<()> {
-
         runtime.spawn_blocking(move || {
             loop {
-
                 // It expects an empty state of price_table and connection_symbols.
                 // If initializes them with required structues on-the-fly.
                 if let Some(update) = rx.pop() {
@@ -336,8 +327,7 @@ where
 
                     // The symbol could be added to the connected_symbols
                     if !connected_symbols.contains_key(symbol.base()) {
-                        connected_symbols
-                            .insert(symbol.base().to_string().clone(), HashSet::new());
+                        connected_symbols.insert(symbol.base().to_string().clone(), HashSet::new());
                     }
 
                     if !connected_symbols.contains_key(symbol.quote()) {
@@ -354,7 +344,6 @@ where
                         .get_mut(symbol.quote())
                         .expect("INTERNAL ERROR: Quote symbol wasn't found")
                         .insert(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
-
                 } else {
                     // Wait for 50ms if there is no new event
                     std::thread::sleep(Duration::from_millis(50));
@@ -364,8 +353,10 @@ where
     }
 
     /// Get all pools in which this symbol appears, very useful for most strategies
-    pub fn get_interchanged_symbols(&self, symbol: &String) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
-
+    pub fn get_interchanged_symbols(
+        &self,
+        symbol: &String,
+    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
         if let Some(symbols) = self.connected_symbols.get(symbol) {
             return Ok(symbols);
         }
@@ -374,8 +365,10 @@ where
     }
 
     /// Fetches price on certain symbol from the observer
-    pub fn get_price_from_table(&self, symbol: &ExchangeSymbol) -> OResult<Arc<Mutex<AskBidValues>>> {
-
+    pub fn get_price_from_table(
+        &self,
+        symbol: &ExchangeSymbol,
+    ) -> OResult<Arc<Mutex<AskBidValues>>> {
         if let Some(price) = self.price_table.get(&symbol) {
             return Ok(price.value().clone());
         }
@@ -432,7 +425,6 @@ where
 /// Main structure to view realtime prices on remote observer. It receives Websocket price
 /// updates from the remote WS observer server and stores them in the `price_table` map structure.
 pub struct WsRemoteObserver {
-
     /// Local websocket client to the exch_observer WS server.
     ws_client: WsRemoteObserverClient,
 
@@ -443,21 +435,22 @@ pub struct WsRemoteObserver {
 }
 
 impl WsRemoteObserver {
-
     pub fn new(runtime: Arc<Runtime>, obs_config: ObserverConfig, ws_config: WsConfig) -> Self {
-        let ws_client = WsRemoteObserverClient::new(runtime.clone(), obs_config.clone(), ws_config.clone());
+        let ws_client =
+            WsRemoteObserverClient::new(runtime.clone(), obs_config.clone(), ws_config.clone());
 
         Self {
             ws_client: ws_client,
             driver_map: HashMap::new(),
-            runtime: runtime
+            runtime: runtime,
         }
     }
 
     fn start_listener_threads(&mut self) {
         for (exchange, rx) in self.ws_client.rx_map.drain() {
             info!("Starting rx listener thread for {}", exchange.to_string());
-            let driver = RemoteObserverDriver::new_instant_start(rx, exchange.clone(), self.runtime.clone());
+            let driver =
+                RemoteObserverDriver::new_instant_start(rx, exchange.clone(), self.runtime.clone());
             self.driver_map.insert(exchange, driver);
         }
     }
@@ -471,7 +464,11 @@ impl WsRemoteObserver {
     }
 
     /// Get all pools in which this symbol appears, very useful for most strategies
-    pub fn get_interchanged_symbols(&self, exchange: ExchangeKind, symbol: &String) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
+    pub fn get_interchanged_symbols(
+        &self,
+        exchange: ExchangeKind,
+        symbol: &String,
+    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return driver.get_interchanged_symbols(symbol);
         }
@@ -480,7 +477,11 @@ impl WsRemoteObserver {
     }
 
     /// Fetches price on certain symbol from the observer
-    pub fn get_price_from_table(&self, exchange: ExchangeKind, symbol: &ExchangeSymbol) -> OResult<Arc<Mutex<AskBidValues>>> {
+    pub fn get_price_from_table(
+        &self,
+        exchange: ExchangeKind,
+        symbol: &ExchangeSymbol,
+    ) -> OResult<Arc<Mutex<AskBidValues>>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return driver.get_price_from_table(symbol);
         }
@@ -498,7 +499,10 @@ impl WsRemoteObserver {
     }
 
     /// Function to dump the existing prices into a newly created HashMap.
-    pub fn dump_price_table(&self, exchange: ExchangeKind) -> OResult<HashMap<ExchangeSymbol, AskBidValues>> {
+    pub fn dump_price_table(
+        &self,
+        exchange: ExchangeKind,
+    ) -> OResult<HashMap<ExchangeSymbol, AskBidValues>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return Ok(driver.dump_price_table());
         }

@@ -356,10 +356,7 @@ where
                 .expect("Failed to receive Mutex")
                 .deref();
             let key = element.key().clone();
-            let symbol = self
-                .str_symbol_mapping
-                .get(&key)
-                .unwrap();
+            let symbol = self.str_symbol_mapping.get(&key).unwrap();
 
             price_table.insert(symbol.clone(), value);
         }

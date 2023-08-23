@@ -249,12 +249,7 @@ impl ObserverWsRunner {
                         self.driver
                             .lock()
                             .expect("Failed to capture RWLock")
-                            .spawn_new_server(
-                                &self.config.host,
-                                config.ws_port,
-                                rx,
-                                kind,
-                            );
+                            .spawn_new_server(&self.config.host, config.ws_port, rx, kind);
                     }
                 }
 
@@ -263,12 +258,7 @@ impl ObserverWsRunner {
                         self.driver
                             .lock()
                             .expect("Failed to capture RWLock")
-                            .spawn_new_server(
-                                &self.config.host,
-                                config.ws_port,
-                                rx,
-                                kind,
-                            );
+                            .spawn_new_server(&self.config.host, config.ws_port, rx, kind);
                     }
                 }
 
@@ -277,12 +267,7 @@ impl ObserverWsRunner {
                         self.driver
                             .lock()
                             .expect("Failed to capture RWLock")
-                            .spawn_new_server(
-                                &self.config.host,
-                                config.ws_port,
-                                rx,
-                                kind,
-                            );
+                            .spawn_new_server(&self.config.host, config.ws_port, rx, kind);
                     }
                 }
 

@@ -1,6 +1,4 @@
-use exch_observer_types::{
-    ExchangeKind
-};
+use exch_observer_types::ExchangeKind;
 use thiserror::Error;
 
 /// Enum of errors that can occur in the Observer
