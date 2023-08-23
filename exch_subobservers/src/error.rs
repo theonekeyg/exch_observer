@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use exch_observer_types::{
     ExchangeKind
 };

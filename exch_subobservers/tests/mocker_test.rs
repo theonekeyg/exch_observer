@@ -1,7 +1,6 @@
-use exch_observer_config::ObserverConfig;
 use exch_observer_types::{
     AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
-    OrderedExchangeSymbol, PairedExchangeSymbol, SwapOrder,
+    OrderedExchangeSymbol, SwapOrder,
 };
 use exch_subobservers::{CombinedObserver, MockerObserver};
 use std::sync::{Arc, Mutex};
@@ -27,12 +26,14 @@ fn create_ask_bid_values() -> (f64, f64, Arc<Mutex<AskBidValues>>) {
     )
 }
 
+#[allow(dead_code)]
 enum ObserverWrapper {
     Combined(CombinedObserver<ExchangeSymbol>),
     Mocker(Box<dyn ExchangeObserver<ExchangeSymbol, Values = AskBidValues>>),
 }
 
 impl ObserverWrapper {
+    #[allow(dead_code)]
     pub fn add_price_to_monitor(
         &mut self,
         symbol: &ExchangeSymbol,

@@ -1,15 +1,11 @@
 use std::{
-    cmp::PartialEq,
     net::TcpStream,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex
     },
     ops::Deref,
-    fmt::{Display, Debug},
     collections::{HashMap, HashSet},
     time::Duration,
-    hash::Hash,
 };
 use exch_observer_types::{
     ExchangeKind, AskBidValues, PriceUpdateEvent, ExchangeSymbol, OrderedExchangeSymbol,
@@ -20,12 +16,12 @@ use exch_observer_config::{
 };
 use dashmap::{DashMap, mapref::one::Ref};
 use tungstenite::{
-    connect, handshake::client::Response, protocol::WebSocket, stream::MaybeTlsStream, Message,
+    connect, protocol::WebSocket, stream::MaybeTlsStream, Message,
     error::Result as WsResult,
     client::IntoClientRequest,
 };
 use ringbuf::{
-    HeapRb, SharedRb,
+    HeapRb,
     producer::Producer,
     consumer::Consumer
 };
@@ -40,6 +36,7 @@ struct WsObserverClientThreadData {
     pub rx: Producer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
     /// URL to the ws server
     pub ws_uri: String,
+    #[allow(dead_code)]
     /// Exchange kind
     pub exchange: ExchangeKind,
 }
@@ -62,9 +59,6 @@ impl WsObserverClientThreadData {
 /// It is used to connect to remove WS server and listen to updates on it.
 /// Push the updates into the local SPSC queue.
 pub struct WsRemoteObserverClient {
-    /// Internal map that stores websocket connections to the remote server.
-    ws_sockets: HashMap<ExchangeKind, WebSocket<MaybeTlsStream<TcpStream>>>,
-
     /// Internal map that stores necessary info for each exchange
     thread_data_vec: Vec<WsObserverClientThreadData>,
 
@@ -138,7 +132,6 @@ impl WsRemoteObserverClient {
         }
 
         Self {
-            ws_sockets: HashMap::new(),
             thread_data_vec: thread_data_vec,
             rx_map: rx_map,
             obs_config: obs_config,
@@ -331,7 +324,6 @@ where
                 // It expects an empty state of price_table and connection_symbols.
                 // If initializes them with required structues on-the-fly.
                 if let Some(update) = rx.pop() {
-                    let symbol_idx = update.symbol.to_string();
                     let symbol = update.symbol;
 
                     // If the symbol is already in the price table, simply update the price,
