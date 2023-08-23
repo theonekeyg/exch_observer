@@ -5,8 +5,9 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex
     },
+    ops::Deref,
     fmt::{Display, Debug},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     time::Duration,
     hash::Hash,
 };
@@ -17,7 +18,7 @@ use exch_observer_types::{
 use exch_observer_config::{
     ObserverConfig, WsConfig
 };
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::one::Ref};
 use tungstenite::{
     connect, handshake::client::Response, protocol::WebSocket, stream::MaybeTlsStream, Message,
 };
@@ -26,7 +27,7 @@ use ringbuf::{
     producer::Producer,
     consumer::Consumer
 };
-use log::error;
+use log::{error, info};
 use tokio::{task::JoinHandle, runtime::{Runtime}};
 use crate::error::{
     ObserverError, ObserverResult as OResult
@@ -78,7 +79,7 @@ pub struct WsRemoteObserverClient {
 
     jobs: Vec<JoinHandle<()>>,
 
-    pub runtime: Arc<Runtime>,
+    runtime: Arc<Runtime>,
 }
 
 impl WsRemoteObserverClient {
@@ -177,8 +178,6 @@ impl WsRemoteObserverClient {
                     },
                     _ => {}
                 }
-
-                println!("Received a message from the server! {:?}", res);
             }
         })
     }
@@ -200,53 +199,71 @@ impl WsRemoteObserverClient {
 
 /// Internal threads that handles each exchange, including websocket connection, price table,
 /// and other necessary data.
-struct RemoteObserverDriver<Symbol>
-where
-    Symbol: Eq
-        + Hash
-        + Clone
-        + Display
-        + Debug
-        + Into<String>
-        + Send
-        + Sync
-        + PairedExchangeSymbol
-        + 'static,
+struct RemoteObserverDriver
 {
     /// `price_table` - Represents the main storage for prices, as well as accessing the
     /// prices in the storage. Here key is the pair name (e.g. ethusdt), not the single
     /// token like in `connected_symbols`. It is made this way to be able to index this
     /// map from already concatenated pair names, when turning concatenated string into
     /// ExchangeSymbol is impossible.
-    price_table: Arc<DashMap<String, Arc<Mutex<AskBidValues>>>>,
+    price_table: Arc<DashMap<ExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
 
     /// `connected_symbols` - Connected symbols represent all existing pools on certain token,
     /// hence here `key` is single token (e.g. eth, btc), not pair (e.g. ethusdt).
-    pub connected_symbols: Arc<DashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>>,
+    pub connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
 
-    // /// Internal consumer of events emitted by the WS client.
-    // rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
-
+    /// Running job handle
     job: Option<JoinHandle<()>>,
 
     runtime: Arc<Runtime>,
+
+    /// Exchange kind of this driver.
+    exchange: ExchangeKind,
+
+    /// Internal consumer of events emitted by the WS client.
+    rx: Option<Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>>,
 }
 
-impl<Symbol> RemoteObserverDriver<Symbol>
+impl RemoteObserverDriver
 where
-    Symbol: Eq
-        + Hash
-        + Clone
-        + Display
-        + Debug
-        + Into<String>
-        + Send
-        + Sync
-        + PairedExchangeSymbol
-        + 'static,
 {
+    #[allow(dead_code)]
     pub fn new(
         rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+        exchange: ExchangeKind,
+        runtime: Arc<Runtime>,
+    ) -> Self {
+        let price_table = Arc::new(DashMap::new());
+        let connected_symbols = Arc::new(DashMap::new());
+
+        Self {
+            price_table: price_table,
+            connected_symbols: connected_symbols,
+            job: None,
+            runtime: runtime,
+            exchange: exchange,
+            rx: Some(rx),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn start(&mut self) {
+        let rx = self.rx
+            .take()
+            .expect("Invalid call of start method, RemoveObserverDriver::rx is None");
+        let job = Self::spawn_listen_task(
+            rx,
+            self.price_table.clone(),
+            self.connected_symbols.clone(),
+            self.runtime.clone(),
+        );
+
+        self.job = Some(job);
+    }
+
+    pub fn new_instant_start(
+        rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+        exchange: ExchangeKind,
         runtime: Arc<Runtime>,
     ) -> Self {
         let price_table = Arc::new(DashMap::new());
@@ -264,13 +281,15 @@ where
             connected_symbols: connected_symbols,
             job: Some(job),
             runtime: runtime,
+            exchange: exchange,
+            rx: None,
         }
     }
 
     fn spawn_listen_task(
         mut rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
-        price_table: Arc<DashMap<String, Arc<Mutex<AskBidValues>>>>,
-        connected_symbols: Arc<DashMap<String, Vec<OrderedExchangeSymbol<Symbol>>>>,
+        price_table: Arc<DashMap<ExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
+        connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
         runtime: Arc<Runtime>,
     ) -> JoinHandle<()> {
 
@@ -285,61 +304,120 @@ where
 
                     // If the symbol is already in the price table, simply update the price,
                     // otherwise add it to the price table first.
-                    if let Some(price) = price_table.get(&symbol_idx) {
+                    if let Some(price) = price_table.get(&symbol) {
                         *price.lock().expect("Failed to get mutex") = update.price;
                     } else {
-                        price_table.insert(symbol_idx.clone(), Arc::new(Mutex::new(update.price)));
+                        price_table.insert(symbol.clone(), Arc::new(Mutex::new(update.price)));
                     }
 
-
-                    // The symbol could be added to the connected_symbolsk
+                    // The symbol could be added to the connected_symbols
                     if !connected_symbols.contains_key(symbol.base()) {
                         connected_symbols
-                            .insert(symbol.base().to_string().clone(), Vec::new());
+                            .insert(symbol.base().to_string().clone(), HashSet::new());
                     }
 
                     if !connected_symbols.contains_key(symbol.quote()) {
                         connected_symbols
-                            .insert(symbol.quote().to_string().clone(), Vec::new());
+                            .insert(symbol.quote().to_string().clone(), HashSet::new());
                     }
 
-
-                    // Insert OrderedExchangeSymbol into the connected_symbols map for both
-                    // base and quote tokens
+                    // If symbols hasn't appeared already, add it to the connected_symbols
                     connected_symbols
                         .get_mut(symbol.base())
                         .expect("INTERNAL ERROR: Base symbol wasn't found")
-                        .push(OrderedExchangeSymbol::new(&(symbol as Symbol), SwapOrder::Sell));
+                        .insert(OrderedExchangeSymbol::new(&symbol, SwapOrder::Sell));
                     connected_symbols
                         .get_mut(symbol.quote())
                         .expect("INTERNAL ERROR: Quote symbol wasn't found")
-                        .push(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
+                        .insert(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
 
                 } else {
-                    std::thread::sleep(Duration::from_millis(100));
+                    // Wait for 50ms if there is no new event
+                    std::thread::sleep(Duration::from_millis(50));
                 }
             }
         })
     }
 
-    pub fn start(&mut self) {
+    /// Get all pools in which this symbol appears, very useful for most strategies
+    pub fn get_interchanged_symbols(&self, symbol: &String) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
+
+        if let Some(symbols) = self.connected_symbols.get(symbol) {
+            return Ok(symbols);
+        }
+
+        Err(ObserverError::SymbolNotFound(self.exchange.clone(), symbol.clone()).into())
+    }
+
+    /// Fetches price on certain symbol from the observer
+    pub fn get_price_from_table(&self, symbol: &ExchangeSymbol) -> OResult<Arc<Mutex<AskBidValues>>> {
+
+        if let Some(price) = self.price_table.get(&symbol) {
+            return Ok(price.value().clone());
+        }
+
+        Err(ObserverError::SymbolNotFound(self.exchange.clone(), symbol.to_string()).into())
+    }
+
+    /// Returns value of certain token to usd if available
+    pub fn get_usd_value(&self, sym: &String) -> OResult<f64> {
+        // TODO: This lock USD wrapped tokens to 1 seems to be unnecessary,
+        // considering to remove this later
+        if let Some(_) = USD_STABLES.into_iter().find(|v| v == sym) {
+            return Ok(1.0);
+        };
+
+        let connected = self.get_interchanged_symbols(sym)?;
+
+        for ordered_sym in connected.iter() {
+            for stable in &USD_STABLES {
+                if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
+                    || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
+                {
+                    return self.get_price_from_table(&ordered_sym.symbol).map(|v| {
+                        let unlocked = v.lock().expect("Failed to get mutex lock for price");
+                        (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
+                    });
+                }
+            }
+        }
+
+        Err(ObserverError::SymbolNotFound(self.exchange.clone(), sym.clone()).into())
+    }
+
+    /// Function to dump the existing prices into a newly created HashMap.
+    pub fn dump_price_table(&self) -> HashMap<ExchangeSymbol, AskBidValues> {
+        let mut price_table: HashMap<ExchangeSymbol, AskBidValues> =
+            HashMap::with_capacity(self.price_table.len());
+
+        for element in self.price_table.iter() {
+            let value = *element
+                .value()
+                .lock()
+                .expect("Failed to receive Mutex")
+                .deref();
+            let symbol = element.key().clone();
+
+            price_table.insert(symbol, value);
+        }
+
+        price_table
     }
 }
 
 /// Main structure to view realtime prices on remote observer. It receives Websocket price
 /// updates from the remote WS observer server and stores them in the `price_table` map structure.
 pub struct WsRemoteObserver {
-    /// Price mapping table. It maps the exchange kind to another map that maps the symbol to
-    /// the current price value. It stores the result in `Arc<Mutex<...>>` so you can share it
-    price_table: Arc<DashMap<ExchangeKind, Arc<DashMap<String, Arc<Mutex<AskBidValues>>>>>>,
-
-    /// `connected_symbols` - Connected symbols represent all existing pools on certain token,
-    /// hence here `key` is single token (e.g. eth, btc), not pair (e.g. ethusdt).
-    pub connected_symbols: Arc<DashMap<ExchangeKind, Arc<DashMap<String, Vec<OrderedExchangeSymbol<ExchangeSymbol>>>>>>,
+    /// General observer config.
     obs_config: ObserverConfig,
+    /// Websocket conifg.
     ws_config: WsConfig,
 
+    /// Local websocket client to the exch_observer WS server.
     ws_client: WsRemoteObserverClient,
+
+    /// Mapping of exchange kind to its driver instance. Each driver connects to single WS port.
+    driver_map: HashMap<ExchangeKind, RemoteObserverDriver>,
 
     runtime: Arc<Runtime>,
 }
@@ -348,50 +426,22 @@ impl WsRemoteObserver {
 
     pub fn new(runtime: Arc<Runtime>, obs_config: ObserverConfig, ws_config: WsConfig) -> Self {
         let ws_client = WsRemoteObserverClient::new(runtime.clone(), obs_config.clone(), ws_config.clone());
-        let price_table = Arc::new(DashMap::new());
-
-        // Insert empty maps for each exchange that is enabled in the config.
-        // Add binance
-        if let Some(config) = &obs_config.binance {
-            if config.enable {
-                price_table.insert(
-                    ExchangeKind::Binance,
-                    Arc::new(DashMap::new())
-                );
-            }
-        }
-
-        // Add huobi
-        if let Some(config) = &obs_config.huobi {
-            if config.enable {
-                price_table.insert(
-                    ExchangeKind::Huobi,
-                    Arc::new(DashMap::new())
-                );
-            }
-        }
-
-        // Add kraken
-        if let Some(config) = &obs_config.kraken {
-            if config.enable {
-                price_table.insert(
-                    ExchangeKind::Kraken,
-                    Arc::new(DashMap::new())
-                );
-            }
-        }
 
         Self {
-            price_table: price_table,
-            connected_symbols: Arc::new(DashMap::new()),
             obs_config: obs_config,
             ws_config: ws_config,
             ws_client: ws_client,
+            driver_map: HashMap::new(),
             runtime: runtime
         }
     }
 
     fn start_listener_threads(&mut self) {
+        for (exchange, rx) in self.ws_client.rx_map.drain() {
+            info!("Starting rx listener thread for {}", exchange.to_string());
+            let driver = RemoteObserverDriver::new_instant_start(rx, exchange.clone(), self.runtime.clone());
+            self.driver_map.insert(exchange, driver);
+        }
     }
 
     pub fn start(&mut self) {
@@ -403,19 +453,9 @@ impl WsRemoteObserver {
     }
 
     /// Get all pools in which this symbol appears, very useful for most strategies
-    pub fn get_interchanged_symbols(&self, exchange: ExchangeKind, symbol: &String)
-        -> OResult<&'_ Vec<OrderedExchangeSymbol<ExchangeSymbol>>> {
-        // &self
-        //     .connected_symbols
-        //     .get(exchange)
-        //     .expect("Symbol wasn't found")
-        //
-        if let Some(connected_symbols) = self.connected_symbols.get(&exchange) {
-            if let Some(connected_symbols) = connected_symbols.get(symbol) {
-                return Ok(connected_symbols.value());
-            }
-
-            return Err(ObserverError::SymbolNotFound(exchange.clone(), symbol.clone()).into());
+    pub fn get_interchanged_symbols(&self, exchange: ExchangeKind, symbol: &String) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
+        if let Some(driver) = self.driver_map.get(&exchange) {
+            return driver.get_interchanged_symbols(symbol);
         }
 
         Err(ObserverError::ExchangeNotFound(exchange).into())
@@ -423,12 +463,8 @@ impl WsRemoteObserver {
 
     /// Fetches price on certain symbol from the observer
     pub fn get_price_from_table(&self, exchange: ExchangeKind, symbol: &ExchangeSymbol) -> OResult<Arc<Mutex<AskBidValues>>> {
-        let symbol = <ExchangeSymbol as Into<String>>::into(symbol.clone());
-
-        if let Some(price_map) = self.price_table.get(&exchange) {
-            if let Some(inner) = price_map.get(&symbol) {
-                return Ok(inner.value().clone());
-            }
+        if let Some(driver) = self.driver_map.get(&exchange) {
+            return driver.get_price_from_table(symbol);
         }
 
         Err(ObserverError::ExchangeNotFound(exchange).into())
@@ -436,30 +472,23 @@ impl WsRemoteObserver {
 
     /// Returns value of certain token to usd if available
     pub fn get_usd_value(&self, exchange: ExchangeKind, sym: &String) -> OResult<f64> {
-        // TODO: This lock USD wrapped tokens to 1 seems to be unnecessary,
-        // considering to remove this later
-        if let Some(_) = USD_STABLES.into_iter().find(|v| v == sym) {
-            return Ok(1.0);
-        };
+        if let Some(driver) = self.driver_map.get(&exchange) {
+            return driver.get_usd_value(sym);
+        }
 
-        let connected = self.get_interchanged_symbols(exchange.clone(), sym)?;
+        Err(ObserverError::ExchangeNotFound(exchange).into())
+    }
 
-        for ordered_sym in connected.iter() {
-            for stable in &USD_STABLES {
-                if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
-                    || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
-                {
-                    return self.get_price_from_table(exchange, &ordered_sym.symbol).map(|v| {
-                        let unlocked = v.lock().expect("Failed to get mutex lock for price");
-                        (unlocked.get_ask_price() + unlocked.get_bid_price()) / 2.0
-                    });
-                }
-            }
+    /// Function to dump the existing prices into a newly created HashMap.
+    pub fn dump_price_table(&self, exchange: ExchangeKind) -> OResult<HashMap<ExchangeSymbol, AskBidValues>> {
+        if let Some(driver) = self.driver_map.get(&exchange) {
+            return Ok(driver.dump_price_table());
         }
 
         Err(ObserverError::ExchangeNotFound(exchange).into())
     }
 }
+
 /*
 pub trait ExchangeObserver<Symbol: Eq + Hash> {
     /// Get all pools in which this symbol appears, very useful for most strategies
