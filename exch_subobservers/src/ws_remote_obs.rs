@@ -1,5 +1,5 @@
 use crate::error::{ObserverError, ObserverResult as OResult};
-use dashmap::{mapref::one::Ref, DashMap};
+use dashmap::{mapref::one::Ref, DashMap, DashSet};
 use exch_observer_config::{ObserverConfig, WsConfig};
 use exch_observer_types::{
     AskBidValues, ExchangeKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
@@ -231,6 +231,8 @@ struct RemoteObserverDriver {
     /// hence here `key` is single token (e.g. eth, btc), not pair (e.g. ethusdt).
     pub connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
 
+    watching_symbols: Arc<DashSet<ExchangeSymbol>>,
+
     /// Running job handle
     job: Option<JoinHandle<()>>,
 
@@ -250,29 +252,30 @@ impl RemoteObserverDriver {
         exchange: ExchangeKind,
         runtime: Arc<Runtime>,
     ) -> Self {
-        let price_table = Arc::new(DashMap::new());
-        let connected_symbols = Arc::new(DashMap::new());
-
         Self {
-            price_table: price_table,
-            connected_symbols: connected_symbols,
+            price_table: Arc::new(DashMap::new()),
+            connected_symbols: Arc::new(DashMap::new()),
             job: None,
             runtime: runtime,
             exchange: exchange,
-            rx: Some(rx),
+            watching_symbols: Arc::new(DashSet::new()),
+            rx: Some(rx), // Save rx for use with `start`
         }
     }
 
     #[allow(dead_code)]
     pub fn start(&mut self) {
+        // Take rx from previously saved in `new` method
         let rx = self
             .rx
             .take()
             .expect("Invalid call of start method, RemoveObserverDriver::rx is None");
+        // Spawn price update task
         let job = Self::spawn_listen_task(
             rx,
             self.price_table.clone(),
             self.connected_symbols.clone(),
+            self.watching_symbols.clone(),
             self.runtime.clone(),
         );
 
@@ -286,17 +289,21 @@ impl RemoteObserverDriver {
     ) -> Self {
         let price_table = Arc::new(DashMap::new());
         let connected_symbols = Arc::new(DashMap::new());
+        let watching_symbols = Arc::new(DashSet::new());
 
+        // Spawn price update task
         let job = Self::spawn_listen_task(
             rx,
             price_table.clone(),
             connected_symbols.clone(),
+            watching_symbols.clone(),
             runtime.clone(),
         );
 
         Self {
             price_table: price_table,
             connected_symbols: connected_symbols,
+            watching_symbols: watching_symbols,
             job: Some(job),
             runtime: runtime,
             exchange: exchange,
@@ -308,6 +315,7 @@ impl RemoteObserverDriver {
         mut rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
         price_table: Arc<DashMap<ExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
         connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
+        watching_symbols: Arc<DashSet<ExchangeSymbol>>,
         runtime: Arc<Runtime>,
     ) -> JoinHandle<()> {
         runtime.spawn_blocking(move || {
@@ -344,12 +352,21 @@ impl RemoteObserverDriver {
                         .get_mut(symbol.quote())
                         .expect("INTERNAL ERROR: Quote symbol wasn't found")
                         .insert(OrderedExchangeSymbol::new(&symbol, SwapOrder::Buy));
+
+                    // Add symbol to the watching_symbols
+                    watching_symbols.insert(symbol.clone());
                 } else {
                     // Wait for 50ms if there is no new event
                     std::thread::sleep(Duration::from_millis(50));
                 }
             }
         })
+    }
+
+    /// Function that returns the current watching_symbols - symbols that we have the price,
+    /// there fore it gets updates from in the observer
+    pub fn get_watching_symbols(&self) -> Arc<DashSet<ExchangeSymbol>> {
+        self.watching_symbols.clone()
     }
 
     /// Get all pools in which this symbol appears, very useful for most strategies
@@ -420,6 +437,7 @@ impl RemoteObserverDriver {
 
         price_table
     }
+
 }
 
 /// Main structure to view realtime prices on remote observer. It receives Websocket price
@@ -477,7 +495,7 @@ impl WsRemoteObserver {
     }
 
     /// Fetches price on certain symbol from the observer
-    pub fn get_price_from_table(
+    pub fn get_price(
         &self,
         exchange: ExchangeKind,
         symbol: &ExchangeSymbol,
@@ -505,6 +523,14 @@ impl WsRemoteObserver {
     ) -> OResult<HashMap<ExchangeSymbol, AskBidValues>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return Ok(driver.dump_price_table());
+        }
+
+        Err(ObserverError::ExchangeNotFound(exchange).into())
+    }
+
+    pub fn get_watching_symbols(&self, exchange: ExchangeKind) -> OResult<Arc<DashSet<ExchangeSymbol>>> {
+        if let Some(driver) = self.driver_map.get(&exchange) {
+            return Ok(driver.get_watching_symbols());
         }
 
         Err(ObserverError::ExchangeNotFound(exchange).into())
