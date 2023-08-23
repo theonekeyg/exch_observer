@@ -21,6 +21,8 @@ use exch_observer_config::{
 use dashmap::{DashMap, mapref::one::Ref};
 use tungstenite::{
     connect, handshake::client::Response, protocol::WebSocket, stream::MaybeTlsStream, Message,
+    error::Result as WsResult,
+    client::IntoClientRequest,
 };
 use ringbuf::{
     HeapRb, SharedRb,
@@ -146,15 +148,45 @@ impl WsRemoteObserverClient {
         }
     }
 
+    fn get_working_connection<Req: IntoClientRequest>(req: Req) -> WsResult<WebSocket<MaybeTlsStream<TcpStream>>> {
+        let (ws_stream, _) = connect(req)?;
+        Ok(ws_stream)
+    }
+
+    fn get_connection_with_reconnect_on_failure(req: &String) -> WebSocket<MaybeTlsStream<TcpStream>> {
+        loop {
+            // Try to establish connection
+            if let Ok(ws_stream) = Self::get_working_connection(req) {
+                // If connection is established, return it
+                info!("Connected to the ws server: {}", req);
+                break ws_stream;
+            } else {
+
+                // Log error on failure, sleep for 5 seconds and try again
+                error!("Failed to connect to the ws server: {}, trying to reconnect with 5 seconds interval", req);
+                // Sleep for 5 seconds
+                std::thread::sleep(Duration::from_secs(5));
+                continue;
+            }
+        }
+    }
+
     fn spawn_ws_handler(runtime: Arc<Runtime>, mut thread_data: WsObserverClientThreadData) -> JoinHandle<()> {
         runtime.spawn_blocking(move || {
-            let (mut ws_stream, _) = connect(&thread_data.ws_uri)
-                .expect(
-                    format!("Failed to connect to ws server: {}", thread_data.ws_uri).as_str()
-                );
+
+            // Firstly try to initialize the ws_stream.
+            let mut ws_stream = Self::get_connection_with_reconnect_on_failure(&thread_data.ws_uri);
 
             loop {
-                let res = ws_stream.read().unwrap();
+                let res = if let Ok(res) = ws_stream.read() {
+                    res
+                } else {
+                    // If we catch error on reading from the ws_stream, try to reconnect
+                    error!("Failed to read from the ws stream, trying to reconnect with 5 seconds interval");
+
+                    ws_stream = Self::get_connection_with_reconnect_on_failure(&thread_data.ws_uri);
+                    continue;
+                };
 
                 match &res {
                     Message::Text(text) => {
@@ -408,10 +440,6 @@ where
 /// Main structure to view realtime prices on remote observer. It receives Websocket price
 /// updates from the remote WS observer server and stores them in the `price_table` map structure.
 pub struct WsRemoteObserver {
-    /// General observer config.
-    obs_config: ObserverConfig,
-    /// Websocket conifg.
-    ws_config: WsConfig,
 
     /// Local websocket client to the exch_observer WS server.
     ws_client: WsRemoteObserverClient,
@@ -428,8 +456,6 @@ impl WsRemoteObserver {
         let ws_client = WsRemoteObserverClient::new(runtime.clone(), obs_config.clone(), ws_config.clone());
 
         Self {
-            obs_config: obs_config,
-            ws_config: ws_config,
             ws_client: ws_client,
             driver_map: HashMap::new(),
             runtime: runtime
