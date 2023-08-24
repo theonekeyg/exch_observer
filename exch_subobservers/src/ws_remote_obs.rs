@@ -512,6 +512,16 @@ impl WsRemoteObserver {
         self.ws_client.start();
     }
 
+    /// Returns the array of enabled exchanges
+    pub fn get_supported_exchanges(&self) -> Vec<ExchangeKind> {
+        let mut exchanges = Vec::new();
+        for (exchange, _) in self.driver_map.iter() {
+            exchanges.push(exchange.clone());
+        }
+
+        exchanges
+    }
+
     /// Get all pools in which this symbol appears, very useful for most strategies
     pub fn get_interchanged_symbols(
         &self,
