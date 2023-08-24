@@ -24,6 +24,8 @@ pub static USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
 
 /// Base trait for a symbol of the exchange pair.
 pub trait PairedExchangeSymbol {
+    /// Create new instance of PairedExchangeSymbol from the inner symbol and the exchange.
+    fn from_inner_symbol(symbol: ExchangeSymbol, exchange: ExchangeKind) -> Self;
     /// Returns the base token in the symbol (e.g. `eth` in `ethbtc`)
     fn base(&self) -> &str;
     /// Returns the quote token in the symbol (e.g. `btc` in `ethbtc`)
@@ -52,6 +54,13 @@ impl From<BSymbol> for ExchangeSymbol {
 }
 
 impl PairedExchangeSymbol for ExchangeSymbol {
+    fn from_inner_symbol(symbol: ExchangeSymbol, _: ExchangeKind) -> Self {
+        Self {
+            base: symbol.base,
+            quote: symbol.quote,
+        }
+    }
+
     fn base(&self) -> &str {
         &self.base
     }
@@ -138,7 +147,31 @@ pub struct ArbitrageExchangeSymbol {
     pub min_qty: Decimal,
 }
 
+impl Default for ArbitrageExchangeSymbol {
+    fn default() -> Self {
+        Self {
+            inner: ExchangeSymbol::from("", ""),
+            pair_name: "".to_string(),
+            min_price: dec!(0.00000001),
+            base_precision: 8,
+            qty_step_size: dec!(0.00000001),
+            price_tick_size: dec!(0.00000001),
+            min_notional: dec!(0.00000001),
+            min_qty: dec!(0.00000001),
+        }
+    }
+}
+
 impl PairedExchangeSymbol for ArbitrageExchangeSymbol {
+    fn from_inner_symbol(symbol: ExchangeSymbol, exchange: ExchangeKind) -> Self {
+        let pair_name = crate::utils::format_symbol(symbol.clone(), exchange);
+        Self {
+            inner: symbol,
+            pair_name,
+            ..Default::default()
+        }
+    }
+
     fn base(&self) -> &str {
         self.inner.base()
     }
@@ -280,6 +313,25 @@ impl ArbitrageExchangeSymbol {
             price_tick_size: price_tick_size,
             min_notional: min_notional,
             min_qty: min_qty,
+        }
+    }
+
+    // pub fn default_with_inner(inner: ExchangeSymbol, exchange: ExchangeKind) -> Self {
+    //     Self {
+    //         inner: inner.clone(),
+    //         pair_name: crate::utils::format_symbol(exchange, inner),
+    //         ..Default::default()
+    //     }
+    // }
+
+    pub fn new_symbols_only<S>(base: S, quote: S, pair_name: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            inner: ExchangeSymbol::new(base, quote),
+            pair_name: pair_name.into(),
+            ..Default::default()
         }
     }
 }
@@ -554,7 +606,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
 
     /// Function to set tx sender to send messages on price updates from observer.
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>);
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>);
 
     /// Function to dump the existing prices into a newly created HashMap. Pretty expensive
     /// function to call.
@@ -718,14 +770,14 @@ impl Into<ExchangeBalance> for BinanceBalance {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Price update event, must be sent to receiver when price is updated
-pub struct PriceUpdateEvent {
+pub struct PriceUpdateEvent<Symbol: Eq + Hash> {
     pub exchange: ExchangeKind,
-    pub symbol: ExchangeSymbol,
+    pub symbol: Symbol,
     pub price: AskBidValues,
 }
 
-impl PriceUpdateEvent {
-    pub fn new(exchange: ExchangeKind, symbol: ExchangeSymbol, price: AskBidValues) -> Self {
+impl<Symbol: Eq + Hash> PriceUpdateEvent<Symbol> {
+    pub fn new(exchange: ExchangeKind, symbol: Symbol, price: AskBidValues) -> Self {
         Self {
             exchange: exchange,
             symbol: symbol,
@@ -747,7 +799,7 @@ pub struct ObserverWorkerThreadData<Symbol: Eq + Hash> {
     /// Atomic bool to check if thread is running
     pub is_running: Arc<AtomicBool>,
     /// Sender to send update prices
-    pub tx: Option<mpsc::Sender<PriceUpdateEvent>>,
+    pub tx: Option<mpsc::Sender<PriceUpdateEvent<Symbol>>>,
     /// Handle to the tokio task
     pub handle: Option<JoinHandle<()>>,
 }
@@ -789,12 +841,12 @@ impl<Symbol: Eq + Hash + Clone> ObserverWorkerThreadData<Symbol> {
     }
 
     /// Set the tx channel to send price updates
-    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         self.tx = Some(tx);
     }
 
     /// Send update price event to the tx channel if it exists
-    pub fn update_price_event(&mut self, event: PriceUpdateEvent) {
+    pub fn update_price_event(&mut self, event: PriceUpdateEvent<Symbol>) {
         if let Some(tx) = &self.tx {
             tx.send(event).unwrap();
         }

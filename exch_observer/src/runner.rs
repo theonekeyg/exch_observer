@@ -1,17 +1,21 @@
 use log::info;
-use std::sync::{Arc, RwLock};
+use rust_decimal::Decimal;
+use std::{
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 use exch_observer_config::ExchObserverConfig;
 use exch_observer_rpc::ObserverRpcRunner;
-use exch_observer_types::ExchangeSymbol;
+use exch_observer_types::ArbitrageExchangeSymbol;
 use exch_observer_ws::ObserverWsRunner;
 use exch_subobservers::CombinedObserver;
 
 /// Main runner for the observer binary, contains the main observer and the
 /// configured services in the config
 pub struct ObserverRunner {
-    pub main_observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+    pub main_observer: Arc<RwLock<CombinedObserver<ArbitrageExchangeSymbol>>>,
     pub config: ExchObserverConfig,
     pub runtime: Arc<Runtime>,
 }
@@ -49,10 +53,35 @@ impl ObserverRunner {
             // Create the observers, load their symbols and launch them
             let mut observer = self.main_observer.write().unwrap();
             observer.create_observers().unwrap();
+            // observer.load_symbols(|record| {
+            //     let base_sym = record.get(0).unwrap();
+            //     let quote_sym = record.get(1).unwrap();
+            //     Some(ExchangeSymbol::from(base_sym, quote_sym))
+            // });
+
             observer.load_symbols(|record| {
-                let base_sym = record.get(0).unwrap();
-                let quote_sym = record.get(1).unwrap();
-                Some(ExchangeSymbol::from(base_sym, quote_sym))
+                let base = record.get(0).unwrap();
+                let quote = record.get(1).unwrap();
+                let pair_name = record.get(2).unwrap();
+
+                let min_price = Decimal::from_str(record.get(3).unwrap()).unwrap();
+                let base_precision = u8::from_str(record.get(4).unwrap()).unwrap();
+                let qty_step_size = Decimal::from_str(record.get(5).unwrap()).unwrap();
+                let price_tick_size = Decimal::from_str(record.get(6).unwrap()).unwrap();
+                let min_notional = Decimal::from_str(record.get(7).unwrap()).unwrap();
+                let min_qty = Decimal::from_str(record.get(8).unwrap()).unwrap();
+
+                Some(ArbitrageExchangeSymbol::new(
+                    base,
+                    quote,
+                    pair_name,
+                    min_price,
+                    base_precision,
+                    qty_step_size,
+                    price_tick_size,
+                    min_notional,
+                    min_qty,
+                ))
             });
             observer.launch().unwrap();
         }

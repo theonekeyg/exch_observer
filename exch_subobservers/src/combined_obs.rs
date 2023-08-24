@@ -351,7 +351,7 @@ where
         None
     }
 
-    pub fn set_tx_fifo(&mut self, kind: ExchangeKind, tx: mpsc::Sender<PriceUpdateEvent>) {
+    pub fn set_tx_fifo(&mut self, kind: ExchangeKind, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         if let Some(observer) = self.observers.get_mut(&kind) {
             observer.set_tx_fifo(tx);
         }

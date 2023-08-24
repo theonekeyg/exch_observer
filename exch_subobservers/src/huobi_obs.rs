@@ -2,8 +2,8 @@ use crate::internal::MulticonObserverDriver;
 use dashmap::DashMap;
 use exch_apis::{common::WebsocketEvent, huobi_ws::HuobiWebsocket};
 use exch_observer_types::{
-    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
-    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::{info, trace};
 use std::{
@@ -111,7 +111,7 @@ where
                     .clone();
                 thread_data.update_price_event(PriceUpdateEvent::new(
                     ExchangeKind::Huobi,
-                    ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                    symbol.clone(),
                     AskBidValues::new_with_prices(ask_price, bid_price),
                 ));
             }
@@ -171,7 +171,7 @@ where
         self.driver.get_watching_symbols()
     }
 
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         self.driver.set_tx_fifo(tx);
     }
 

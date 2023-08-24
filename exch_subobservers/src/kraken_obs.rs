@@ -5,8 +5,8 @@ use exch_apis::{
     kraken_ws::KrakenWebsocket,
 };
 use exch_observer_types::{
-    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
-    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 use log::{info, trace};
 use std::{
@@ -18,10 +18,6 @@ use std::{
 use tokio::runtime::Runtime;
 
 pub static KRAKEN_USD_STABLES: [&str; 4] = ["USDT", "USD", "DAI", "USDC"];
-
-pub fn kraken_symbol(symbol: impl PairedExchangeSymbol) -> String {
-    format!("{}/{}", symbol.base(), symbol.quote())
-}
 
 pub struct KrakenObserver<Symbol>
 where
@@ -103,7 +99,7 @@ where
                         .clone();
                     thread_data.update_price_event(PriceUpdateEvent::new(
                         ExchangeKind::Kraken,
-                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        symbol.clone(),
                         AskBidValues::new_with_prices(ask_price, bid_price),
                     ));
                 }
@@ -132,7 +128,7 @@ where
                         .clone();
                     thread_data.update_price_event(PriceUpdateEvent::new(
                         ExchangeKind::Kraken,
-                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        symbol.clone(),
                         AskBidValues::new_with_prices(ask_price, bid_price),
                     ));
                 }
@@ -199,7 +195,7 @@ where
         self.driver.get_watching_symbols()
     }
 
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         self.driver.set_tx_fifo(tx);
     }
 

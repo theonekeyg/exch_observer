@@ -14,8 +14,8 @@ use tokio::runtime::Runtime;
 
 use crate::internal::MulticonObserverDriver;
 use exch_observer_types::{
-    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeSymbol, ExchangeValues,
-    ObserverWorkerThreadData, OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
+    AskBidValues, ExchangeKind, ExchangeObserver, ExchangeValues, ObserverWorkerThreadData,
+    OrderedExchangeSymbol, PairedExchangeSymbol, PriceUpdateEvent,
 };
 
 #[allow(unused)]
@@ -164,7 +164,7 @@ where
 
                     thread_data.update_price_event(PriceUpdateEvent::new(
                         ExchangeKind::Binance,
-                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        symbol.clone(),
                         AskBidValues::new_with_prices(ask_price, bid_price),
                     ));
                 }
@@ -194,7 +194,7 @@ where
                         .clone();
                     thread_data.update_price_event(PriceUpdateEvent::new(
                         ExchangeKind::Binance,
-                        ExchangeSymbol::new(symbol.base(), symbol.quote()),
+                        symbol.clone(),
                         AskBidValues::new_with_prices(ask_price, bid_price),
                     ));
                 }
@@ -258,7 +258,7 @@ where
         self.driver.get_watching_symbols()
     }
 
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         self.driver.set_tx_fifo(tx);
     }
 

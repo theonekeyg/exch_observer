@@ -1,11 +1,15 @@
 use dashmap::DashMap;
 use exch_observer_config::{ObserverConfig, WsConfig};
-use exch_observer_types::{ExchangeKind, ExchangeSymbol, PriceUpdateEvent};
+use exch_observer_types::{
+    ArbitrageExchangeSymbol, ExchangeKind, PairedExchangeSymbol, PriceUpdateEvent,
+};
 use exch_subobservers::CombinedObserver;
 use log::{debug, info};
+use serde::Serialize;
 use std::{
     collections::HashMap,
-    fmt::Debug,
+    fmt::{Debug, Display},
+    hash::Hash,
     net::{TcpListener, TcpStream},
     sync::{mpsc, Arc, Mutex, RwLock},
 };
@@ -30,20 +34,46 @@ impl WsClient {
 
 /// Internal structure that holds and updates the state of the websocket server.
 /// Manages subscribers and tasks for listening to the price updates.
-struct ObserverWsDriver {
+struct ObserverWsDriver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Debug
+        + Display
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + Serialize
+        + 'static,
+{
     /// Map of exchange kind to websocket subscribers
     pub subscribers: Arc<DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>>,
 
     /// Observer that will be used to get the prices
-    observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+    observer: Arc<RwLock<CombinedObserver<Symbol>>>,
 
     pub runtime: Arc<Runtime>,
 }
 
-impl ObserverWsDriver {
+impl<Symbol> ObserverWsDriver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Debug
+        + Display
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + Serialize
+        + 'static,
+{
     pub fn new(
         subscribers: DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>,
-        observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        observer: Arc<RwLock<CombinedObserver<Symbol>>>,
         runtime: Arc<Runtime>,
     ) -> Self {
         Self {
@@ -57,7 +87,7 @@ impl ObserverWsDriver {
     /// for `exchange`.
     pub fn rx_block_loop(
         exchange: ExchangeKind,
-        rx: mpsc::Receiver<PriceUpdateEvent>,
+        rx: mpsc::Receiver<PriceUpdateEvent<Symbol>>,
         subscribers: Arc<Mutex<Vec<WsClient>>>,
     ) {
         debug!("Starting rx_block_loop for {}", exchange.to_str());
@@ -98,7 +128,7 @@ impl ObserverWsDriver {
     }
 
     pub fn handle_new_ws_connection(
-        observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        observer: Arc<RwLock<CombinedObserver<Symbol>>>,
         subscribers: Arc<DashMap<ExchangeKind, Arc<Mutex<Vec<WsClient>>>>>,
         stream: TcpStream,
         exchange: ExchangeKind,
@@ -116,7 +146,7 @@ impl ObserverWsDriver {
                 symbol: symbol.clone(),
                 price: price.clone(),
             })
-            .collect::<Vec<PriceUpdateEvent>>();
+            .collect::<Vec<PriceUpdateEvent<Symbol>>>();
 
         // Serialize the prices dump and send it to the client
         let msg_text = serde_json::to_string(&prices_dump).unwrap();
@@ -143,7 +173,7 @@ impl ObserverWsDriver {
         &mut self,
         host: &String,
         port: u16,
-        rx: mpsc::Receiver<PriceUpdateEvent>,
+        rx: mpsc::Receiver<PriceUpdateEvent<Symbol>>,
         exchange: ExchangeKind,
     ) {
         // Spawn websocket task to await incoming updates and send them to subscribers.
@@ -181,7 +211,20 @@ impl ObserverWsDriver {
 
 /// This struct serves as a main interface to exch_observer WS service.
 /// It sends the data about the prices to the connected WS clients.
-pub struct ObserverWsRunner {
+pub struct ObserverWsRunner<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Debug
+        + Display
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + Serialize
+        + 'static,
+{
     /// Config for the ws server
     pub config: WsConfig,
 
@@ -190,18 +233,44 @@ pub struct ObserverWsRunner {
 
     /// Map of exchange kind to mpsc channel receiver
     /// that will be used to send the prices to the subscribed WS clients
-    pub exchange_kind_to_rx: HashMap<ExchangeKind, mpsc::Receiver<PriceUpdateEvent>>,
+    pub exchange_kind_to_rx: HashMap<ExchangeKind, mpsc::Receiver<PriceUpdateEvent<Symbol>>>,
 
     /// Driver for the websocket server
-    driver: Arc<Mutex<ObserverWsDriver>>,
+    driver: Arc<Mutex<ObserverWsDriver<Symbol>>>,
 }
 
-unsafe impl Send for ObserverWsRunner {}
-unsafe impl Sync for ObserverWsRunner {}
+unsafe impl<Symbol> Send for ObserverWsRunner<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Debug
+        + Display
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + Serialize
+        + 'static
+{
+}
+unsafe impl<Symbol> Sync for ObserverWsRunner<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Debug
+        + Display
+        + Into<String>
+        + Send
+        + Sync
+        + PairedExchangeSymbol
+        + Serialize
+        + 'static
+{
+}
 
-impl ObserverWsRunner {
+impl ObserverWsRunner<ArbitrageExchangeSymbol> {
     pub fn new(
-        observer: &Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+        observer: &Arc<RwLock<CombinedObserver<ArbitrageExchangeSymbol>>>,
         runtime: Arc<Runtime>,
         config: WsConfig,
         obs_config: ObserverConfig,
