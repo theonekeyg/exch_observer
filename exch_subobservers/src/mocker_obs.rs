@@ -103,7 +103,7 @@ where
         self.driver.get_watching_symbols()
     }
 
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         self.driver.set_tx_fifo(tx);
     }
 

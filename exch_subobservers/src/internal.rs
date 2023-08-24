@@ -337,7 +337,7 @@ where
     }
 
     /// Sets tx price-update fifo for all running threads
-    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>) {
+    pub fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<Symbol>>) {
         // Set tx fifo for all running threads
         for thread_data in &self.threads_data_vec {
             thread_data.lock().unwrap().set_tx_fifo(tx.clone());

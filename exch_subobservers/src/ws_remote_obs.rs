@@ -2,7 +2,7 @@ use crate::error::{ObserverError, ObserverResult as OResult};
 use dashmap::{mapref::one::Ref, DashMap, DashSet};
 use exch_observer_config::{ObserverConfig, WsConfig};
 use exch_observer_types::{
-    AskBidValues, ExchangeKind, ExchangeSymbol, ExchangeValues, OrderedExchangeSymbol,
+    ArbitrageExchangeSymbol, AskBidValues, ExchangeKind, ExchangeValues, OrderedExchangeSymbol,
     PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES,
 };
 use log::{error, info};
@@ -22,7 +22,10 @@ use tungstenite::{
 
 struct WsObserverClientThreadData {
     /// Producer of the SPSC queue
-    pub rx: Producer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+    pub rx: Producer<
+        PriceUpdateEvent<ArbitrageExchangeSymbol>,
+        Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+    >,
     /// URL to the ws server
     pub ws_uri: String,
     #[allow(dead_code)]
@@ -32,7 +35,10 @@ struct WsObserverClientThreadData {
 
 impl WsObserverClientThreadData {
     pub fn new(
-        rx: Producer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+        rx: Producer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
         ws_uri: String,
         exchange: ExchangeKind,
     ) -> Self {
@@ -54,7 +60,13 @@ pub struct WsRemoteObserverClient {
     /// Must be used by the used of WsRemoteObserverClient to get consumer of the queues.
     /// It fills from the config in the constructor and must be consumed by the higher
     /// application, for example, by using `HashMap::drain`.
-    pub rx_map: HashMap<ExchangeKind, Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>>,
+    pub rx_map: HashMap<
+        ExchangeKind,
+        Consumer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
+    >,
 
     /// Configs for individual observers
     pub obs_config: ObserverConfig,
@@ -76,7 +88,8 @@ impl WsRemoteObserverClient {
         // Add binance
         if let Some(config) = &obs_config.binance {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) =
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -92,7 +105,8 @@ impl WsRemoteObserverClient {
         // Add huobi
         if let Some(config) = &obs_config.huobi {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) =
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -107,7 +121,8 @@ impl WsRemoteObserverClient {
         // Add kraken
         if let Some(config) = &obs_config.kraken {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) =
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -178,13 +193,13 @@ impl WsRemoteObserverClient {
                 match &res {
                     Message::Text(text) => {
                         // Deserialize the message and push it into the queue
-                        // let event: PriceUpdateEvent = serde_json::from_str(text);
-                        if let Ok(event) = serde_json::from_str::<PriceUpdateEvent>(text) {
+                        // let event: PriceUpdateEvent<ArbitrageExchangeSymbol> = serde_json::from_str(text);
+                        if let Ok(event) = serde_json::from_str::<PriceUpdateEvent<ArbitrageExchangeSymbol>>(text) {
                             thread_data
                                 .rx
                                 .push(event)
                                 .expect("Failed to push event into the queue");
-                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent>>(text) {
+                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent<ArbitrageExchangeSymbol>>>(text) {
                             for e in event.drain(0..) {
                                 thread_data
                                     .rx
@@ -224,14 +239,15 @@ struct RemoteObserverDriver {
     /// prices in the storage. Here key is the pair name (e.g. ethusdt), not the single
     /// token like in `connected_symbols`. It is made this way to be able to index this
     /// map from already concatenated pair names, when turning concatenated string into
-    /// ExchangeSymbol is impossible.
-    price_table: Arc<DashMap<ExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
+    /// ArbitrageExchangeSymbol is impossible.
+    price_table: Arc<DashMap<ArbitrageExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
 
     /// `connected_symbols` - Connected symbols represent all existing pools on certain token,
     /// hence here `key` is single token (e.g. eth, btc), not pair (e.g. ethusdt).
-    pub connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
+    pub connected_symbols:
+        Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ArbitrageExchangeSymbol>>>>,
 
-    watching_symbols: Arc<DashSet<ExchangeSymbol>>,
+    watching_symbols: Arc<DashSet<ArbitrageExchangeSymbol>>,
 
     /// Running job handle
     job: Option<JoinHandle<()>>,
@@ -242,13 +258,21 @@ struct RemoteObserverDriver {
     exchange: ExchangeKind,
 
     /// Internal consumer of events emitted by the WS client.
-    rx: Option<Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>>,
+    rx: Option<
+        Consumer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
+    >,
 }
 
 impl RemoteObserverDriver {
     #[allow(dead_code)]
     pub fn new(
-        rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+        rx: Consumer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
         exchange: ExchangeKind,
         runtime: Arc<Runtime>,
     ) -> Self {
@@ -283,7 +307,10 @@ impl RemoteObserverDriver {
     }
 
     pub fn new_instant_start(
-        rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
+        rx: Consumer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
         exchange: ExchangeKind,
         runtime: Arc<Runtime>,
     ) -> Self {
@@ -312,10 +339,15 @@ impl RemoteObserverDriver {
     }
 
     fn spawn_listen_task(
-        mut rx: Consumer<PriceUpdateEvent, Arc<HeapRb<PriceUpdateEvent>>>,
-        price_table: Arc<DashMap<ExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
-        connected_symbols: Arc<DashMap<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>>,
-        watching_symbols: Arc<DashSet<ExchangeSymbol>>,
+        mut rx: Consumer<
+            PriceUpdateEvent<ArbitrageExchangeSymbol>,
+            Arc<HeapRb<PriceUpdateEvent<ArbitrageExchangeSymbol>>>,
+        >,
+        price_table: Arc<DashMap<ArbitrageExchangeSymbol, Arc<Mutex<AskBidValues>>>>,
+        connected_symbols: Arc<
+            DashMap<String, HashSet<OrderedExchangeSymbol<ArbitrageExchangeSymbol>>>,
+        >,
+        watching_symbols: Arc<DashSet<ArbitrageExchangeSymbol>>,
         runtime: Arc<Runtime>,
     ) -> JoinHandle<()> {
         runtime.spawn_blocking(move || {
@@ -365,7 +397,7 @@ impl RemoteObserverDriver {
 
     /// Function that returns the current watching_symbols - symbols that we have the price,
     /// there fore it gets updates from in the observer
-    pub fn get_watching_symbols(&self) -> Arc<DashSet<ExchangeSymbol>> {
+    pub fn get_watching_symbols(&self) -> Arc<DashSet<ArbitrageExchangeSymbol>> {
         self.watching_symbols.clone()
     }
 
@@ -373,7 +405,7 @@ impl RemoteObserverDriver {
     pub fn get_interchanged_symbols(
         &self,
         symbol: &String,
-    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
+    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ArbitrageExchangeSymbol>>>> {
         if let Some(symbols) = self.connected_symbols.get(symbol) {
             return Ok(symbols);
         }
@@ -384,7 +416,7 @@ impl RemoteObserverDriver {
     /// Fetches price on certain symbol from the observer
     pub fn get_price_from_table(
         &self,
-        symbol: &ExchangeSymbol,
+        symbol: &ArbitrageExchangeSymbol,
     ) -> OResult<Arc<Mutex<AskBidValues>>> {
         if let Some(price) = self.price_table.get(&symbol) {
             return Ok(price.value().clone());
@@ -420,8 +452,8 @@ impl RemoteObserverDriver {
     }
 
     /// Function to dump the existing prices into a newly created HashMap.
-    pub fn dump_price_table(&self) -> HashMap<ExchangeSymbol, AskBidValues> {
-        let mut price_table: HashMap<ExchangeSymbol, AskBidValues> =
+    pub fn dump_price_table(&self) -> HashMap<ArbitrageExchangeSymbol, AskBidValues> {
+        let mut price_table: HashMap<ArbitrageExchangeSymbol, AskBidValues> =
             HashMap::with_capacity(self.price_table.len());
 
         for element in self.price_table.iter() {
@@ -437,7 +469,6 @@ impl RemoteObserverDriver {
 
         price_table
     }
-
 }
 
 /// Main structure to view realtime prices on remote observer. It receives Websocket price
@@ -486,7 +517,7 @@ impl WsRemoteObserver {
         &self,
         exchange: ExchangeKind,
         symbol: &String,
-    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ExchangeSymbol>>>> {
+    ) -> OResult<Ref<String, HashSet<OrderedExchangeSymbol<ArbitrageExchangeSymbol>>>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return driver.get_interchanged_symbols(symbol);
         }
@@ -498,7 +529,7 @@ impl WsRemoteObserver {
     pub fn get_price(
         &self,
         exchange: ExchangeKind,
-        symbol: &ExchangeSymbol,
+        symbol: &ArbitrageExchangeSymbol,
     ) -> OResult<Arc<Mutex<AskBidValues>>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return driver.get_price_from_table(symbol);
@@ -520,7 +551,7 @@ impl WsRemoteObserver {
     pub fn dump_price_table(
         &self,
         exchange: ExchangeKind,
-    ) -> OResult<HashMap<ExchangeSymbol, AskBidValues>> {
+    ) -> OResult<HashMap<ArbitrageExchangeSymbol, AskBidValues>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return Ok(driver.dump_price_table());
         }
@@ -528,7 +559,10 @@ impl WsRemoteObserver {
         Err(ObserverError::ExchangeNotFound(exchange).into())
     }
 
-    pub fn get_watching_symbols(&self, exchange: ExchangeKind) -> OResult<Arc<DashSet<ExchangeSymbol>>> {
+    pub fn get_watching_symbols(
+        &self,
+        exchange: ExchangeKind,
+    ) -> OResult<Arc<DashSet<ArbitrageExchangeSymbol>>> {
         if let Some(driver) = self.driver_map.get(&exchange) {
             return Ok(driver.get_watching_symbols());
         }
@@ -566,7 +600,7 @@ pub trait ExchangeObserver<Symbol: Eq + Hash> {
     fn get_watching_symbols(&self) -> &'_ Vec<Symbol>;
 
     /// Function to set tx sender to send messages on price updates from observer.
-    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent>);
+    fn set_tx_fifo(&mut self, tx: mpsc::Sender<PriceUpdateEvent<ArbitrageExchangeSymbol>>);
 
     /// Function to dump the existing prices into a newly created HashMap. Pretty expensive
     /// function to call.

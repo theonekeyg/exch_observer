@@ -8,10 +8,12 @@ use observer_rpc::{
 };
 
 use exch_observer_config::RpcConfig;
-use exch_observer_types::{ExchangeKind, ExchangeSymbol, ExchangeValues};
+use exch_observer_types::{ExchangeKind, ExchangeSymbol, ExchangeValues, PairedExchangeSymbol};
 use exch_subobservers::CombinedObserver;
 use log::{debug, info};
 use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
     marker::Sync,
     net::SocketAddr,
     str::FromStr,
@@ -20,12 +22,38 @@ use std::{
 use tonic::{transport::Server, Request, Response, Status};
 
 /// Struct representing the observer RPC service
-pub struct GrpcObserver {
-    observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
+pub struct GrpcObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
+    observer: Arc<RwLock<CombinedObserver<Symbol>>>,
 }
 
-impl GrpcObserver {
-    pub fn new(observer: Arc<RwLock<CombinedObserver<ExchangeSymbol>>>) -> Self {
+impl<Symbol> GrpcObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
+    pub fn new(observer: Arc<RwLock<CombinedObserver<Symbol>>>) -> Self {
         Self {
             observer: observer.clone(),
         }
@@ -43,19 +71,59 @@ impl GrpcObserver {
     }
 }
 
-unsafe impl Send for GrpcObserver {}
-unsafe impl Sync for GrpcObserver {}
+unsafe impl<Symbol> Send for GrpcObserver<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static
+{
+}
+unsafe impl<Symbol> Sync for GrpcObserver<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static
+{
+}
 
 #[tonic::async_trait]
-impl ExchObserver for GrpcObserver {
+impl<Symbol> ExchObserver for GrpcObserver<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
     async fn get_price(
         &self,
         request: Request<GetPriceRequest>,
     ) -> Result<Response<GetPriceResponse>, Status> {
         let observer = self.observer.read().unwrap();
         let request = request.into_inner();
-        let symbol = ExchangeSymbol::from(&request.base, &request.quote);
         let exchange = ExchangeKind::from_str(&request.exchange).unwrap();
+        let inner_symbol = ExchangeSymbol::new(request.base.clone(), request.quote.clone());
+        let symbol = Symbol::from_inner_symbol(inner_symbol, exchange.clone());
 
         debug!(
             "Received price request for symbol {} on exchange {}",
@@ -100,19 +168,68 @@ impl ExchObserver for GrpcObserver {
 }
 
 /// Struct representing server for RPC service in `exch_observer`
-pub struct ObserverRpcRunner {
-    rpc: Arc<GrpcObserver>,
+pub struct ObserverRpcRunner<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
+    rpc: Arc<GrpcObserver<Symbol>>,
     config: RpcConfig,
 }
 
-unsafe impl Send for ObserverRpcRunner {}
-unsafe impl Sync for ObserverRpcRunner {}
+unsafe impl<Symbol> Send for ObserverRpcRunner<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static
+{
+}
+unsafe impl<Symbol> Sync for ObserverRpcRunner<Symbol> where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static
+{
+}
 
-impl ObserverRpcRunner {
-    pub fn new(
-        observer: &Arc<RwLock<CombinedObserver<ExchangeSymbol>>>,
-        config: RpcConfig,
-    ) -> Self {
+impl<Symbol> ObserverRpcRunner<Symbol>
+where
+    Symbol: Eq
+        + Hash
+        + Clone
+        + Display
+        + Debug
+        + Into<String>
+        + PairedExchangeSymbol
+        + Into<String>
+        + Send
+        + Sync
+        + 'static,
+{
+    pub fn new(observer: &Arc<RwLock<CombinedObserver<Symbol>>>, config: RpcConfig) -> Self {
         let rpc = GrpcObserver::new(observer.clone());
 
         Self {
