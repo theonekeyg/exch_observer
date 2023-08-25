@@ -83,7 +83,7 @@ impl WsRemoteObserver {
         // Add binance
         if let Some(config) = &obs_config.binance {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(8192).split();
                 let thread_data = WsObserverThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -99,7 +99,7 @@ impl WsRemoteObserver {
         // Add huobi
         if let Some(config) = &obs_config.huobi {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(8192).split();
                 let thread_data = WsObserverThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -114,7 +114,7 @@ impl WsRemoteObserver {
         // Add kraken
         if let Some(config) = &obs_config.kraken {
             if config.enable {
-                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(1000).split();
+                let (tx, rx) = HeapRb::<PriceUpdateEvent>::new(8192).split();
                 let thread_data = WsObserverThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -152,16 +152,20 @@ impl WsRemoteObserver {
                         // Deserialize the message and push it into the queue
                         // let event: PriceUpdateEvent = serde_json::from_str(text);
                         if let Ok(event) = serde_json::from_str::<PriceUpdateEvent>(text) {
-                            thread_data
-                                .rx
-                                .push(event)
-                                .expect("Failed to push event into the queue");
-                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent>>(text) {
-                            for e in event.drain(0..) {
+                            if !thread_data.rx.is_full() {
                                 thread_data
                                     .rx
-                                    .push(e.clone())
+                                    .push(event)
                                     .expect("Failed to push event into the queue");
+                            }
+                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent>>(text) {
+                            for e in event.drain(0..) {
+                                if !thread_data.rx.is_full() {
+                                    thread_data
+                                        .rx
+                                        .push(e.clone())
+                                        .expect("Failed to push event into the queue");
+                                }
                             }
                         } else {
                             error!("Failed to deserialize the message: {}", text);

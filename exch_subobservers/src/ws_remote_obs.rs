@@ -89,7 +89,7 @@ impl WsRemoteObserverClient {
         if let Some(config) = &obs_config.binance {
             if config.enable {
                 let (tx, rx) =
-                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(4096).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -106,7 +106,7 @@ impl WsRemoteObserverClient {
         if let Some(config) = &obs_config.huobi {
             if config.enable {
                 let (tx, rx) =
-                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(4096).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -122,7 +122,7 @@ impl WsRemoteObserverClient {
         if let Some(config) = &obs_config.kraken {
             if config.enable {
                 let (tx, rx) =
-                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(1000).split();
+                    HeapRb::<PriceUpdateEvent<ArbitrageExchangeSymbol>>::new(4096).split();
                 let thread_data = WsObserverClientThreadData::new(
                     tx,
                     format!("ws://{}:{}", ws_config.host, config.ws_port),
@@ -195,16 +195,20 @@ impl WsRemoteObserverClient {
                         // Deserialize the message and push it into the queue
                         // let event: PriceUpdateEvent<ArbitrageExchangeSymbol> = serde_json::from_str(text);
                         if let Ok(event) = serde_json::from_str::<PriceUpdateEvent<ArbitrageExchangeSymbol>>(text) {
-                            thread_data
-                                .rx
-                                .push(event)
-                                .expect("Failed to push event into the queue");
-                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent<ArbitrageExchangeSymbol>>>(text) {
-                            for e in event.drain(0..) {
+                            if !thread_data.rx.is_full() {
                                 thread_data
                                     .rx
-                                    .push(e.clone())
+                                    .push(event)
                                     .expect("Failed to push event into the queue");
+                            }
+                        } else if let Ok(mut event) = serde_json::from_str::<Vec<PriceUpdateEvent<ArbitrageExchangeSymbol>>>(text) {
+                            for e in event.drain(0..) {
+                                if !thread_data.rx.is_full() {
+                                    thread_data
+                                        .rx
+                                        .push(e.clone())
+                                        .expect("Failed to push event into the queue");
+                                }
                             }
                         } else {
                             error!("Failed to deserialize the message: {}", text);
