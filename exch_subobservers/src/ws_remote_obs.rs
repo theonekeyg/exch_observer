@@ -3,7 +3,7 @@ use dashmap::{mapref::one::Ref, DashMap, DashSet};
 use exch_observer_config::{ObserverConfig, WsConfig};
 use exch_observer_types::{
     ArbitrageExchangeSymbol, AskBidValues, ExchangeKind, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES,
+    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES, KRAKEN_USD_STABLES
 };
 use log::{error, info};
 use ringbuf::{consumer::Consumer, producer::Producer, HeapRb};
@@ -429,18 +429,29 @@ impl RemoteObserverDriver {
         Err(ObserverError::SymbolNotFound(self.exchange.clone(), symbol.to_string()).into())
     }
 
+    fn get_usd_stables(&self) -> impl Iterator<Item = &str> {
+        match self.exchange {
+            // For kraken, stables are defined in KRAKEN_USD_STABLES
+            ExchangeKind::Kraken => { KRAKEN_USD_STABLES.into_iter() },
+            // For binance and huobi, stables are defined in USD_STABLED
+            ExchangeKind::Binance | ExchangeKind::Huobi => { USD_STABLES.into_iter() },
+            _ => { unimplemented!("INTERNAL ERROR: Exchange not supported") }
+        }
+        // USD_STABLES.into_iter()
+    }
+
     /// Returns value of certain token to usd if available
     pub fn get_usd_value(&self, sym: &String) -> OResult<f64> {
         // TODO: This lock USD wrapped tokens to 1 seems to be unnecessary,
         // considering to remove this later
-        if let Some(_) = USD_STABLES.into_iter().find(|v| v == sym) {
+        if let Some(_) = self.get_usd_stables().find(|v| v == sym) {
             return Ok(1.0);
         };
 
         let connected = self.get_interchanged_symbols(sym)?;
 
         for ordered_sym in connected.iter() {
-            for stable in &USD_STABLES {
+            for stable in self.get_usd_stables() {
                 if <&str as Into<String>>::into(stable) == ordered_sym.symbol.base()
                     || <&str as Into<String>>::into(stable) == ordered_sym.symbol.quote()
                 {

@@ -21,6 +21,7 @@ use std::{
 use tokio::task::JoinHandle;
 
 pub static USD_STABLES: [&str; 4] = ["usdt", "usdc", "busd", "dai"];
+pub static KRAKEN_USD_STABLES: [&str; 4] = ["USD", "USDT", "USDC", "DAI"];
 
 /// Base trait for a symbol of the exchange pair.
 pub trait PairedExchangeSymbol {
