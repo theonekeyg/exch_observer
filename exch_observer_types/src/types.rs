@@ -271,7 +271,7 @@ impl From<AssetPair> for ArbitrageExchangeSymbol {
         let quote_asset = split.next().unwrap();
         let min_price = symbol.costmin.unwrap();
         let base_precision: u8 = symbol.cost_decimals.try_into().unwrap();
-        let qty_step_size = 1 / ((10 as u64).pow(symbol.pair_decimals.try_into().unwrap()));
+        let qty_step_size = 1 / ((10 as u64).pow(symbol.lot_decimals.try_into().unwrap()));
         let price_tick_size = symbol.tick_size.unwrap();
         let min_notional = symbol.costmin.unwrap();
         let min_qty = symbol.ordermin.unwrap();
