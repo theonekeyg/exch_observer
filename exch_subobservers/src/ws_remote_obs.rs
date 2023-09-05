@@ -3,7 +3,7 @@ use dashmap::{mapref::one::Ref, DashMap, DashSet};
 use exch_observer_config::{ObserverConfig, WsConfig};
 use exch_observer_types::{
     ArbitrageExchangeSymbol, AskBidValues, ExchangeKind, ExchangeValues, OrderedExchangeSymbol,
-    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, USD_STABLES, KRAKEN_USD_STABLES
+    PairedExchangeSymbol, PriceUpdateEvent, SwapOrder, KRAKEN_USD_STABLES, USD_STABLES,
 };
 use log::{error, info};
 use ringbuf::{consumer::Consumer, producer::Producer, HeapRb};
@@ -432,10 +432,12 @@ impl RemoteObserverDriver {
     fn get_usd_stables(&self) -> impl Iterator<Item = &str> {
         match self.exchange {
             // For kraken, stables are defined in KRAKEN_USD_STABLES
-            ExchangeKind::Kraken => { KRAKEN_USD_STABLES.into_iter() },
+            ExchangeKind::Kraken => KRAKEN_USD_STABLES.into_iter(),
             // For binance and huobi, stables are defined in USD_STABLED
-            ExchangeKind::Binance | ExchangeKind::Huobi => { USD_STABLES.into_iter() },
-            _ => { unimplemented!("INTERNAL ERROR: Exchange not supported") }
+            ExchangeKind::Binance | ExchangeKind::Huobi => USD_STABLES.into_iter(),
+            _ => {
+                unimplemented!("INTERNAL ERROR: Exchange not supported")
+            }
         }
         // USD_STABLES.into_iter()
     }
