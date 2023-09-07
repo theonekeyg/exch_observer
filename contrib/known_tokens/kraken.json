@@ -1,0 +1,35 @@
+{
+  "usdt": {
+    "symbol": "USDT"
+  },
+  "eth": {
+    "symbol": "ETH"
+  },
+  "btc": {
+    "symbol": "WBTC"
+  },
+  "xrp": {
+    "symbol": "XRP"
+  },
+  "dai": {
+    "symbol": "DAI"
+  },
+  "usdc": {
+    "symbol": "USDC"
+  },
+  "matic": {
+    "symbol": "MATIC"
+  },
+  "ltc": {
+    "symbol": "LTC"
+  },
+  "eos": {
+    "symbol": "EOS"
+  },
+  "ada": {
+    "symbol": "ADA"
+  },
+  "tusd": {
+    "symbol": "TUSD"
+  }
+}

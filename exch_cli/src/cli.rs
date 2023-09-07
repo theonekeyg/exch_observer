@@ -9,6 +9,7 @@ use tokio::runtime::Builder as RuntimeBuilder;
 
 lazy_static! {
     static ref DEFAULT_CONFIG: String = env::var("HOME").unwrap() + "/.exch_observer/default.toml";
+    static ref KNOWN_TOKENS_DIR: String = env::var("HOME").unwrap() + "/.exch_observer/known_tokens/";
 }
 
 #[derive(Debug, Subcommand)]
