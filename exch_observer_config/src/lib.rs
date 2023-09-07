@@ -1,5 +1,4 @@
-use std::{default::Default, fmt::Display, fs::File, io::Read, path::Path, collections::HashMap};
-use exch_observer_types::ExchangeKind;
+use std::{default::Default, fs::File, io::Read, path::Path};
 
 use serde::Deserialize;
 
@@ -152,36 +151,5 @@ impl ExchObserverConfig {
         }
 
         Ok(config)
-    }
-}
-
-/// Represents a known token for the observers unique for the exchange.
-/// Different observers might have their own needs
-#[derive(Debug, Clone, Deserialize)]
-pub struct ObserverKnownToken {
-    pub symbol: String,
-}
-
-pub struct ObserverKnownTokens {
-    pub exchange: ExchangeKind,
-    pub map: HashMap<String, ObserverKnownToken>,
-}
-
-impl ObserverKnownTokens {
-    pub fn parse_known_tokens<P: AsRef<Path> + Display>(exchange: ExchangeKind, tokens_dir: P)
-        -> Result<Self, Box<dyn std::error::Error>> {
-
-        let file_path = format!("{}/{}.json", tokens_dir, exchange.to_string());
-
-        let mut file = File::open(file_path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-
-        let map: HashMap<String, ObserverKnownToken> = serde_json::from_str(&contents)?;
-
-        Ok(Self {
-            exchange,
-            map,
-        })
     }
 }
